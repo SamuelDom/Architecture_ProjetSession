@@ -7,7 +7,7 @@ public class Espece {
     public static final int[] humainModif = {1, 1, 1, 1, 1, 1};
     public static final int[] elfeModif = {0, 2, 0, 0, 1, 0};
     public static final int[] nainModif = {1, 0, 2, 0, 0, 0};
-    public static final int[] orcModif = {2, 0, 1, 0, -1, 0};
+    public static final int[] orcModif = {10, 0, 1, 0, -1, 0};
 
     static {
         modificateursMap = new HashMap<>();
