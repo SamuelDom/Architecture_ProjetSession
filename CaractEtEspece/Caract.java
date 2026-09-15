@@ -1,20 +1,26 @@
 public record Caract(
-    int force,
-    int dexterite,
-    int constitution,
-    int intelligence,
-    int sagesse,
-    int charisme,
-    String espece
+    int forceInitiale,
+    int dexteriteInitiale,
+    int constitutionInitiale,
+    int intelligenceInitiale,
+    int sagesseInitiale,
+    int charismeInitiale,
+    String espece,
+    int forceFinale,
+    int dexteriteFinale,
+    int constitutionFinale,
+    int intelligenceFinale,
+    int sagesseFinale,
+    int charismeFinale
 )
 {
     public Caract {
-        validerValeurInitiale("Force", force);
-        validerValeurInitiale("Dextérité", dexterite);
-        validerValeurInitiale("Constitution", constitution);
-        validerValeurInitiale("Intelligence", intelligence);
-        validerValeurInitiale("Sagesse", sagesse);
-        validerValeurInitiale("Charisme", charisme);
+        validerValeurInitiale("Force", forceInitiale);
+        validerValeurInitiale("Dextérité", dexteriteInitiale);
+        validerValeurInitiale("Constitution", constitutionInitiale);
+        validerValeurInitiale("Intelligence", intelligenceInitiale);
+        validerValeurInitiale("Sagesse", sagesseInitiale);
+        validerValeurInitiale("Charisme", charismeInitiale);
     }
 
     private static void validerValeurInitiale(String nom, int valeur) {
@@ -32,13 +38,19 @@ public record Caract(
         }
 
         return new Caract(
-            Math.clamp(force + modificateurs[0], 3, 18),
-            Math.clamp(dexterite + modificateurs[1], 3, 18),
-            Math.clamp(constitution + modificateurs[2], 3, 18),
-            Math.clamp(intelligence + modificateurs[3], 3, 18),
-            Math.clamp(sagesse + modificateurs[4], 3, 18),
-            Math.clamp(charisme + modificateurs[5], 3, 18),
-            espece
+            forceInitiale,
+            dexteriteInitiale,
+            constitutionInitiale,
+            intelligenceInitiale,
+            sagesseInitiale,
+            charismeInitiale,
+            espece,
+            Math.clamp(forceInitiale + ((forceInitiale - 10) / 2) + modificateurs[0], 3, 20),
+            Math.clamp(dexteriteInitiale + ((dexteriteInitiale - 10) / 2) + modificateurs[1], 3, 20),
+            Math.clamp(constitutionInitiale + ((constitutionInitiale - 10) / 2) + modificateurs[2], 3, 20),
+            Math.clamp(intelligenceInitiale + ((intelligenceInitiale - 10) / 2) + modificateurs[3], 3, 20),
+            Math.clamp(sagesseInitiale + ((sagesseInitiale - 10) / 2) + modificateurs[4], 3, 20),
+            Math.clamp(charismeInitiale + ((charismeInitiale - 10) / 2) + modificateurs[5], 3, 20)
         );
     }
 }
