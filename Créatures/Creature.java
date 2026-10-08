@@ -8,13 +8,16 @@ public class Creature {
     private int xp;
     private int initiative;
     private int baseAttack;
+    private String weaponName;
+    private CreaturesWeapons creaturesWeapons;
 
-    public Creature(String nom, int maxHealth, int initialArmor, int xp, int initiative, int baseAttack) {
+    public Creature(String nom, int maxHealth, int initialArmor, int xp, int initiative, int baseAttack, String weaponName) {
         this.nom = nom;
         this.dice = new Dice.dice();
         this.health = new Stats.Health(maxHealth);
         this.capaciteArmure = new Stats.CapaciteArmure(initialArmor);
         this.xp = xp;
+        this.weaponName = weaponName;
         this.initiative = initiative;
         this.baseAttack = baseAttack;
     }
@@ -33,6 +36,10 @@ public class Creature {
 
     public int getBaseAttack() {
         return baseAttack;
+    }
+
+    public int getWeaponDamage() {
+        return creaturesWeapons.getWeaponDamage(weaponName);
     }
 
     public void takeDamage(int damage) {
@@ -76,7 +83,7 @@ public class Creature {
     }
 
     public int testAttack() {
-        int attack = baseAttack + rollDice(6) + 1; // Exemple : attaque de base + lancer de dé à 6 faces
+        int attack = getWeaponDamage() + baseAttack + rollDice(6) + getBaseAttack();
         return attack;
     }
 

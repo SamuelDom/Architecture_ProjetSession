@@ -17,10 +17,6 @@ public class Health {
         return maxHealth;
     }
 
-    public void setCurrentHealth(int currentHealth) {
-        this.currentHealth = currentHealth;
-    }
-
     public void setMaxHealth(int maxHealth) {
         this.maxHealth = maxHealth;
     }

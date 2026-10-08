@@ -17,9 +17,6 @@ public class CapaciteArmure {
         return currentArmor;
     }
 
-    public void setCurrentArmor(int currentArmor) {
-        this.currentArmor = currentArmor;
-    }
 
     public void increaseArmor(int amount) {
         currentArmor += amount;
