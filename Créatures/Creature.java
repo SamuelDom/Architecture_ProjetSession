@@ -50,6 +50,10 @@ public class Creature {
         health.heal(amount);
     }
 
+    public boolean isAlive() {
+        return health.getCurrentHealth() > 0;
+    }
+
     public void resetArmor() {
         capaciteArmure.resetArmor();
     }
@@ -78,8 +82,8 @@ public class Creature {
         return capaciteArmure.getInitialArmor();
     }
 
-    public int rollDice(int max) {
-        return dice.rollDice(max);
+    public int rollDice(int rollSize) {
+        return dice.rollDice(rollSize);
     }
 
     public int testAttack() {
@@ -88,4 +92,6 @@ public class Creature {
     }
 
     // TODO: faire une fonction qui annalyse la vie des joueurs actifs
+    // prendre la liste
+    // et faire un test sur la vie de chaque joueur
 }
