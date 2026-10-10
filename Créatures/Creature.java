@@ -1,4 +1,8 @@
 package Créatures;
+import FakeHeroes.heroes;
+
+import java.util.ArrayList;
+import java.util.List;
 
 public class Creature {
     private String nom;
@@ -18,6 +22,7 @@ public class Creature {
         this.capaciteArmure = new Stats.CapaciteArmure(initialArmor);
         this.xp = xp;
         this.weaponName = weaponName;
+        this.creaturesWeapons = new CreaturesWeapons();
         this.initiative = initiative;
         this.baseAttack = baseAttack;
     }
@@ -87,11 +92,55 @@ public class Creature {
     }
 
     public int testAttack() {
-        int attack = getWeaponDamage() + baseAttack + rollDice(6) + getBaseAttack();
+        int attack = getWeaponDamage() + rollDice(6) + getBaseAttack();
         return attack;
     }
 
-    // TODO: faire une fonction qui annalyse la vie des joueurs actifs
-    // prendre la liste
-    // et faire un test sur la vie de chaque joueur
+    public void comportementCombat(List<heroes> heroesList) {
+        int minPV = Integer.MAX_VALUE; //Comportement du Gobelin
+        int maxPV = Integer.MIN_VALUE; //Comportement de l'Orc
+        ArrayList<Integer> ids = new ArrayList<>();
+        heroes targetHero = null;
+        System.out.println("--- État de l'équipe avant l'attaque ---");
+        if(getNom().equals("Gobelin")) {
+            for (heroes hero : heroesList) {
+                System.out.println("PV du héros " + hero.getNom() + ": " + hero.getPv());
+                
+                if (hero.getPv() > 0 && hero.getPv() < minPV) {
+                    minPV = hero.getPv();
+                    targetHero = hero;
+                }
+            }
+        }
+        else if(getNom().equals("Orc")) {
+            for (heroes hero : heroesList) {
+                System.out.println("PV du héros " + hero.getNom() + ": " + hero.getPv());
+                
+                if (hero.getPv() > 0 && hero.getPv() > maxPV) {
+                    maxPV = hero.getPv();
+                    targetHero = hero;
+                }
+            }
+        }
+        else if(getNom().equals("Troll")) {
+            for (heroes hero : heroesList) {
+                System.out.println("PV du héros " + hero.getNom() + ": " + hero.getPv());
+                
+                if (hero.getPv() > 0) {
+                    ids.add(hero.getId());
+                }
+            }
+            if (!ids.isEmpty()) {
+                int randomIndex = dice.rollDice(ids.size()) - 1; // -1 pour
+                targetHero = heroesList.get(randomIndex);
+            }
+        }
+        System.out.println("----------------------------------------");
+        if (targetHero != null) {
+            System.out.println("-> " + getNom() + " a choisi d'attaquer " + targetHero.getNom());
+            targetHero.takeDamage(testAttack());
+        } else {
+            System.out.println("-> Aucune cible valide.");
+        }
+    }
 }
