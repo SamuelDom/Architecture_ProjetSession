@@ -15,15 +15,15 @@ public class CreaturesModel {
         Orc = new Creature("Orc", 15, 13, 100, 1, 4, "Hache");
         Troll = new Creature("Troll", 35, 15, 300, 0, 6, "Massue");
         GobelinPack = new ArrayList<>();
-        GobelinPack.add(Gobelin);
-        GobelinPack.add(Gobelin);
-        GobelinPack.add(Gobelin);
+        GobelinPack.add(new Creature("Gobelin", 7, 12, 50, 2, 3, "Dague"));
+        GobelinPack.add(new Creature("Gobelin", 7, 12, 50, 2, 3, "Dague"));
+        GobelinPack.add(new Creature("Gobelin", 7, 12, 50, 2, 3, "Dague"));
         OrcCamp = new ArrayList<>();
-        OrcCamp.add(Orc);
-        OrcCamp.add(Orc);
-        OrcCamp.add(Gobelin);
+        OrcCamp.add(new Creature("Orc", 15, 13, 100, 1, 4, "Hache"));
+        OrcCamp.add(new Creature("Orc", 15, 13, 100, 1, 4, "Hache"));
+        OrcCamp.add(new Creature("Gobelin", 7, 12, 50, 2, 3, "Dague"));
         TrollLair = new ArrayList<>();
-        TrollLair.add(Troll);
+        TrollLair.add(new Creature("Troll", 35, 15, 300, 0, 6, "Massue"));
     }
 
     public Creature getGobelin() {
@@ -36,6 +36,18 @@ public class CreaturesModel {
 
     public Creature getTroll() {
         return Troll;
+    }
+
+    public ArrayList<Creature> getGobelinPack() {
+        return GobelinPack;
+    }
+
+    public ArrayList<Creature> getOrcCamp() {
+        return OrcCamp;
+    }
+
+    public ArrayList<Creature> getTrollLair() {
+        return TrollLair;
     }
 
 }

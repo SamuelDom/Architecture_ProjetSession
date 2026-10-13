@@ -1,8 +1,10 @@
 package Créatures;
-import FakeHeroes.heroes;
-
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Iterator;
+import CombatSystem.EffectsTemplate;
+import CombatSystem.StunEffect;
+import FakeHeores.heroes;
 
 public class Creature {
     private String nom;
@@ -14,6 +16,8 @@ public class Creature {
     private int baseAttack;
     private String weaponName;
     private CreaturesWeapons creaturesWeapons;
+    private List<EffectsTemplate> activeEffects = new ArrayList<>();
+    private boolean isStunned;
 
     public Creature(String nom, int maxHealth, int initialArmor, int xp, int initiative, int baseAttack, String weaponName) {
         this.nom = nom;
@@ -25,6 +29,7 @@ public class Creature {
         this.creaturesWeapons = new CreaturesWeapons();
         this.initiative = initiative;
         this.baseAttack = baseAttack;
+        this.isStunned = false;
     }
 
     public String getNom() {
@@ -49,6 +54,11 @@ public class Creature {
 
     public void takeDamage(int damage) {
         health.takeDamage(damage);
+        if(health.getCurrentHealth() <= 0) {
+            health.setCurrentHealth(0);
+            System.out.println(nom + " est mort !");
+        }
+        System.out.println(nom + " a subi " + damage + " points de dégâts. PV restants : " + health.getCurrentHealth());
     }
 
     public void heal(int amount) {
@@ -87,13 +97,22 @@ public class Creature {
         return capaciteArmure.getInitialArmor();
     }
 
-    public int rollDice(int rollSize) {
-        return dice.rollDice(rollSize);
-    }
 
     public int testAttack() {
-        int attack = getWeaponDamage() + rollDice(6) + getBaseAttack();
+        int attack = getWeaponDamage() + dice.rollDiceSix() + getBaseAttack();
         return attack;
+    }
+
+    public boolean stunnedStatus(){
+        return isStunned;
+    }
+
+    public void isStunned(){
+        isStunned = true;
+    }
+
+    public void isNotStunned(){
+        isStunned = false;
     }
 
     public void comportementCombat(List<heroes> heroesList) {
@@ -141,6 +160,25 @@ public class Creature {
             targetHero.takeDamage(testAttack());
         } else {
             System.out.println("-> Aucune cible valide.");
+        }
+    }
+
+    public void addEffect(EffectsTemplate effect){
+        activeEffects.add(effect);
+        effect.applyEffect(this);
+    }
+
+    public void effectChecker(){
+        Iterator<EffectsTemplate> iterator = activeEffects.iterator();
+        while(iterator.hasNext()){
+            EffectsTemplate effect = iterator.next();
+
+            effect.onTurnStart(this);
+            if(effect.tick()){
+                effect.onRemove(this);
+                System.out.println("L'effet" + effect.getName() + " est retiré");
+                iterator.remove();
+            }
         }
     }
 }

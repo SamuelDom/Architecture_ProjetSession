@@ -12,6 +12,15 @@ public class Health {
     public int getCurrentHealth() {
         return currentHealth;
     }
+    public void setCurrentHealth(int currentHealth) {
+        this.currentHealth = currentHealth;
+        if(this.currentHealth < 0) {
+            this.currentHealth = 0;
+        }
+        if(this.currentHealth > maxHealth) {
+            this.currentHealth = maxHealth;
+        }
+    }
 
     public int getMaxHealth() {
         return maxHealth;
