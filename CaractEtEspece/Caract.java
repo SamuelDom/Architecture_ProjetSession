@@ -1,3 +1,6 @@
+package CaractEtEspece;
+import java.util.HashMap;
+
 public record Caract(
     int forceInitiale,
     int dexteriteInitiale,
@@ -32,7 +35,7 @@ public record Caract(
     }
 
     public Caract appliquerModificateurs(String espece) {
-        int[] modificateurs = Espece.modificateursMap.get(espece);
+        HashMap<String, Integer> modificateurs = Espece.modificateursMap.get(espece);
         if (modificateurs == null) {
             throw new IllegalArgumentException("Espèce inconnue: " + espece);
         }
@@ -45,12 +48,12 @@ public record Caract(
             sagesseInitiale,
             charismeInitiale,
             espece,
-            Math.clamp(forceInitiale + ((forceInitiale - 10) / 2) + modificateurs[0], 3, 20),
-            Math.clamp(dexteriteInitiale + ((dexteriteInitiale - 10) / 2) + modificateurs[1], 3, 20),
-            Math.clamp(constitutionInitiale + ((constitutionInitiale - 10) / 2) + modificateurs[2], 3, 20),
-            Math.clamp(intelligenceInitiale + ((intelligenceInitiale - 10) / 2) + modificateurs[3], 3, 20),
-            Math.clamp(sagesseInitiale + ((sagesseInitiale - 10) / 2) + modificateurs[4], 3, 20),
-            Math.clamp(charismeInitiale + ((charismeInitiale - 10) / 2) + modificateurs[5], 3, 20)
+            Math.clamp(forceInitiale + ((forceInitiale - 10) / 2) + modificateurs.get("Force"), 3, 20),
+            Math.clamp(dexteriteInitiale + ((dexteriteInitiale - 10) / 2) + modificateurs.get("Dextérité"), 3, 20),
+            Math.clamp(constitutionInitiale + ((constitutionInitiale - 10) / 2) + modificateurs.get("Constitution"), 3, 20),
+            Math.clamp(intelligenceInitiale + ((intelligenceInitiale - 10) / 2) + modificateurs.get("Intelligence"), 3, 20),
+            Math.clamp(sagesseInitiale + ((sagesseInitiale - 10) / 2) + modificateurs.get("Sagesse"), 3, 20),
+            Math.clamp(charismeInitiale + ((charismeInitiale - 10) / 2) + modificateurs.get("Charisme"), 3, 20)
         );
     }
 }
