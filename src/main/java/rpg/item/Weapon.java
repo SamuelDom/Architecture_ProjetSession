@@ -5,13 +5,13 @@ import rpg.hero.domain.WeaponCategory;
 
 public final class Weapon implements Item {
     private final String name;
-    private final String damageDice;
+    private final int damageDice;
     private final String ability;
     private final WeaponCategory category;
 
-    public Weapon(String name, String damageDice, String ability, WeaponCategory category) {
+    public Weapon(String name, int damageDice, String ability, WeaponCategory category) {
         if (name == null || name.isBlank()) throw new IllegalArgumentException("Le nom de l'arme est obligatoire.");
-        if (damageDice == null || damageDice.isBlank()) throw new IllegalArgumentException("Le dé de dégâts est obligatoire.");
+        if ((Integer)damageDice == null || damageDice <=1) throw new IllegalArgumentException("Le dé de dégâts est obligatoire.");
         if (ability == null || ability.isBlank()) throw new IllegalArgumentException("La caractéristique est obligatoire.");
         this.name = name;
         this.damageDice = damageDice;
@@ -19,7 +19,7 @@ public final class Weapon implements Item {
         this.category = Objects.requireNonNull(category);
     }
 
-    public Weapon(String name, String damageDice, String ability) {
+    public Weapon(String name, int damageDice, String ability) {
         this(name, damageDice, ability, categoryFromName(name));
     }
 
@@ -38,7 +38,7 @@ public final class Weapon implements Item {
     }
 
     @Override public String getName() { return name; }
-    public String getDamageDice() { return damageDice; }
+    public int getDamageDice() { return damageDice; }
     public String getAbility() { return ability; }
     public WeaponCategory getCategory() { return category; }
 }

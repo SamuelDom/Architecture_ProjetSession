@@ -45,7 +45,7 @@ public final class Main {
         }
         System.out.println("Saisissez le numéro d'une cible à votre tour.");
         new Combat(new Scanner(System.in)).start(
-                heroes, List.of(new CreaturesModel().getGobelin()));
+                heroes, new CreaturesModel().getGobelinPack());
     }
 
     private static Hero createHero(CreateHeroUseCase createHero, HeroRepository repository,
@@ -55,7 +55,7 @@ public final class Main {
                 14, 12, 16, 8, 10, 13));
         Hero hero = repository.findById(new HeroId(UUID.fromString(output.id())))
                 .orElseThrow(() -> new IllegalStateException("Le héros créé est introuvable."));
-        Weapon weapon = new Weapon("Épée longue", "1d8", "FOR", WeaponCategory.SWORD);
+        Weapon weapon = new Weapon("Épée longue", 8, "FOR", WeaponCategory.SWORD);
         Armor armor = new Armor("Armure légère", 12, true, ArmorCategory.LIGHT);
         hero.inventory().add(weapon);
         hero.inventory().add(armor);

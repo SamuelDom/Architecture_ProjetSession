@@ -39,7 +39,7 @@ public final class Combat {
 
     public int roundCounter() { return roundCounter; }
 
-    public void start(List<Hero> heroes, List<Creature> creatures) {
+    public void start(List<Hero> heroes, ArrayList<Creature> creatures) {
         if (heroes == null || heroes.isEmpty()) {
             throw new IllegalArgumentException("Au moins un héros est requis pour le combat.");
         }
@@ -107,7 +107,7 @@ public final class Combat {
         int bonus = combatant instanceof Hero hero
                 ? hero.dexterityModifier()
                 : ((Creature) combatant).getInitiative();
-        return dice.roll(20) + bonus;
+        return dice.rollDiceTwenty() + bonus;
     }
 
     private static boolean hasLiving(List<? extends Combatant> participants) {
@@ -131,7 +131,7 @@ public final class Combat {
                     .min(java.util.Comparator.comparingInt(Hero::currentHitPoints)).orElseThrow();
             case "Orc" -> livingHeroes.stream()
                     .max(java.util.Comparator.comparingInt(Hero::currentHitPoints)).orElseThrow();
-            default -> livingHeroes.get(dice.roll(livingHeroes.size()) - 1);
+            default -> livingHeroes.get(dice.rollDice(livingHeroes.size()) - 1);
         };
     }
 

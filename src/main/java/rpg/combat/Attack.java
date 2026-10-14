@@ -49,7 +49,7 @@ public final class Attack {
         Objects.requireNonNull(hero);
         Objects.requireNonNull(target);
         if (!target.isAlive()) throw new IllegalStateException("Une créature vaincue ne peut pas être attaquée.");
-        int roll = dice.roll(20);
+        int roll = dice.rollDiceTwenty();
         Weapon weapon = hero.equipment().getMainWeapon();
         int attackRoll = roll + hero.attackModifier();
         if (roll == 1 || (roll != 20 && attackRoll < target.currentArmor())) {
@@ -57,10 +57,10 @@ public final class Attack {
             return;
         }
 
-        String damageDice = weapon == null ? "1d8" : weapon.getDamageDice();
-        int damage = dice.roll(damageDice) + hero.attackModifier();
+        int damageDice = weapon == null ? 8 : weapon.getDamageDice();
+        int damage = dice.rollDice(damageDice) + hero.attackModifier();
         if (roll == 20) {
-            damage += dice.roll(damageDice);
+            damage += dice.rollDice(damageDice);
             System.out.println("Coup critique !");
         }
         damage = Math.max(1, damage);

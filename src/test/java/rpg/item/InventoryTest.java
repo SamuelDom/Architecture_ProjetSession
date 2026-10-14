@@ -10,7 +10,7 @@ class InventoryTest {
     @Test
     void enforcesCapacityAndSupportsAddingAndRemovingItems() {
         Inventory inventory = new Inventory();
-        Weapon sword = new Weapon("Épée longue", "1d8", "FOR");
+        Weapon sword = new Weapon("Épée longue", 8, "FOR");
         inventory.add(sword);
         assertTrue(inventory.contains(sword));
         inventory.remove(sword);
@@ -22,6 +22,6 @@ class InventoryTest {
         assertTrue(inventory.isFull());
         assertEquals(10, inventory.size());
         assertThrows(IllegalStateException.class,
-                () -> inventory.add(new Weapon("Dague", "1d4", "DEX")));
+                () -> inventory.add(new Weapon("Dague", 4, "DEX")));
     }
 }

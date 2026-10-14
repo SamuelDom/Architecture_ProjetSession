@@ -76,7 +76,7 @@ public final class Creature implements Combatant {
     public void resetArmor() { currentArmor = initialArmor; }
 
     public int testAttack() {
-        return weaponDamage + dice.roll(6) + baseAttack;
+        return weaponDamage + dice.rollDiceSix() + baseAttack;
     }
 
     public Creature copy() {
