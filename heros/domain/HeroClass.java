@@ -1,4 +1,4 @@
-package domain.hero;
+package rpg.hero.domain;
 
 public enum HeroClass {
     WARRIOR(12, 0),

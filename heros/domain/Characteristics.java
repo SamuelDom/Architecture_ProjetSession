@@ -1,4 +1,4 @@
-package domain.hero;
+package hero.domain;
 
 public final class Characteristics {
 
@@ -10,7 +10,7 @@ public final class Characteristics {
     private final int charisma;
 
     public Characteristics(int strength, int dexterity, int constitution,
-                            int intelligence, int wisdom, int charisma) {
+                           int intelligence, int wisdom, int charisma) {
         this.strength = strength;
         this.dexterity = dexterity;
         this.constitution = constitution;
@@ -23,7 +23,7 @@ public final class Characteristics {
         return constitution;
     }
 
-   
+    /** (valeur - 10) / 2 arrondi vers le bas (floorDiv, car / tronque vers zéro). */
     public int modifierOf(int rawValue) {
         return Math.floorDiv(rawValue - 10, 2);
     }

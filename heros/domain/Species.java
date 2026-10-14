@@ -1,4 +1,4 @@
-package domain.hero;
+package rpg.hero.domain;
 
 public enum Species {
     HUMAN,
