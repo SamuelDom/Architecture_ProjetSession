@@ -1,11 +1,16 @@
-package domain.hero;
+package hero.domain;
+
+import hero.infrastructure.InMemoryHeroRepository;
+import hero.domain.exception.DomainException;
 
 public class HeroDemo {
 
     public static void main(String[] args) {
         Characteristics stats = new Characteristics(14, 12, 16, 8, 10, 13);
 
-        Hero thorin = Hero.create("Thorin", Species.DWARF, HeroClass.WARRIOR, stats);
+        HeroRepository repository = new InMemoryHeroRepository();
+        HeroFactory factory = new HeroFactory(repository);
+        Hero thorin = factory.create(new HeroName("Thorin"), Species.DWARF, HeroClass.WARRIOR, stats);
 
         System.out.println("Nom        : " + thorin.name());
         System.out.println("Espèce     : " + thorin.species());
@@ -26,9 +31,9 @@ public class HeroDemo {
 
     private static void tryInvalidName(String name) {
         try {
-            HeroName.of(name);
+            new HeroName(name);
             System.out.println("[ERREUR] Le nom aurait dû être rejeté : " + name);
-        } catch (IllegalArgumentException e) {
+        } catch (DomainException e) {
             System.out.println("Rejeté correctement (\"" + name + "\") : " + e.getMessage());
         }
     }

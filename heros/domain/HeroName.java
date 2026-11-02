@@ -1,6 +1,6 @@
-package rpg.hero.domain;
+package hero.domain;
 
-import rpg.hero.domain.exception.InvalidHeroNameException;
+import hero.domain.exception.InvalidHeroNameException;
 
 import java.util.regex.Pattern;
 

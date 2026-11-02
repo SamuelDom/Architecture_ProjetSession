@@ -1,4 +1,4 @@
-package rpg.hero.domain;
+package hero.domain;
 
 import java.util.Objects;
 import java.util.UUID;

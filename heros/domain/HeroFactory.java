@@ -1,6 +1,6 @@
-package rpg.hero.domain;
+package hero.domain;
 
-import rpg.hero.domain.exception.HeroNameAlreadyTakenException;
+import hero.domain.exception.HeroNameAlreadyTakenException;
 
 import java.util.UUID;
 
