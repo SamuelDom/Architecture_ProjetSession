@@ -5,7 +5,9 @@ import hero.application.GetHeroUseCase;
 import hero.application.HeroOutputMapper;
 import hero.domain.HeroFactory;
 import hero.domain.HeroRepository;
+import hero.infrastructure.HeroHttpServer;
 import hero.infrastructure.InMemoryHeroRepository;
+import java.io.IOException;
 
 /** À remplacer plus tard par l'injection du framework). */
 public class ApplicationContext {
@@ -23,5 +25,9 @@ public class ApplicationContext {
 
     public GetHeroUseCase getHeroUseCase() {
         return getHeroUseCase;
+    }
+
+    public HeroHttpServer createHeroHttpServer(int port) throws IOException {
+        return new HeroHttpServer(port, createHeroUseCase, getHeroUseCase);
     }
 }
