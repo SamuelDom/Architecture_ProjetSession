@@ -8,6 +8,10 @@ import hero.domain.HeroRepository;
 import hero.infrastructure.HeroHttpServer;
 import hero.infrastructure.InMemoryHeroRepository;
 import java.io.IOException;
+import rpg.player.application.PlayerSessions;
+import rpg.player.application.RegisterPlayerUseCase;
+import rpg.player.infrastructure.Argon2PasswordHasher;
+import rpg.player.infrastructure.InMemoryPlayerRepository;
 
 /** À remplacer plus tard par l'injection du framework). */
 public class ApplicationContext {
@@ -19,6 +23,11 @@ public class ApplicationContext {
         private final GetHeroUseCase getHeroUseCase =
             new GetHeroUseCase(heroRepository, new HeroOutputMapper());
 
+    private final InMemoryPlayerRepository players = new InMemoryPlayerRepository();
+    private final Argon2PasswordHasher passwords = new Argon2PasswordHasher();
+    private final RegisterPlayerUseCase registerPlayer = new RegisterPlayerUseCase(players, passwords);
+    private final PlayerSessions sessions = new PlayerSessions(players, passwords);
+
     public CreateHeroUseCase createHeroUseCase() {
         return createHeroUseCase;
     }
@@ -28,6 +37,6 @@ public class ApplicationContext {
     }
 
     public HeroHttpServer createHeroHttpServer(int port) throws IOException {
-        return new HeroHttpServer(port, createHeroUseCase, getHeroUseCase);
+        return new HeroHttpServer(port, createHeroUseCase, getHeroUseCase, registerPlayer, sessions);
     }
 }
