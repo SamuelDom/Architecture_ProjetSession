@@ -11,6 +11,9 @@ import hero.domain.HeroClass;
 import hero.domain.Species;
 import hero.domain.exception.DomainException;
 import hero.domain.exception.HeroNameAlreadyTakenException;
+import rpg.player.application.PlayerSessions;
+import rpg.player.application.RegisterPlayerUseCase;
+import rpg.player.infrastructure.PlayerAuthentication;
 
 import java.io.IOException;
 import java.io.OutputStream;
@@ -27,11 +30,15 @@ public final class HeroHttpServer {
     private final GetHeroUseCase getHeroUseCase;
 
     public HeroHttpServer(int port, CreateHeroUseCase createHeroUseCase,
-                          GetHeroUseCase getHeroUseCase) throws IOException {
+                          GetHeroUseCase getHeroUseCase, RegisterPlayerUseCase registerPlayer,
+                          PlayerSessions sessions) throws IOException {
         this.server = HttpServer.create(new InetSocketAddress(port), 0);
         this.createHeroUseCase = createHeroUseCase;
         this.getHeroUseCase = getHeroUseCase;
-        server.createContext("/heroes", this::handleRequest);
+        var heroes = server.createContext("/heroes", this::handleRequest);
+        heroes.setAuthenticator(new PlayerAuthentication(sessions));
+        server.createContext("/players", exchange -> handleRegistration(exchange, registerPlayer));
+        server.createContext("/sessions", exchange -> handleSignIn(exchange, sessions));
     }
 
     public void start() {
@@ -41,10 +48,80 @@ public final class HeroHttpServer {
     public static void main(String[] args) throws IOException {
         int port = args.length == 0 ? 8080 : Integer.parseInt(args[0]);
         ApplicationContext context = new ApplicationContext();
-        HeroHttpServer server = new HeroHttpServer(
-                port, context.createHeroUseCase(), context.getHeroUseCase());
+        HeroHttpServer server = context.createHeroHttpServer(port);
         server.start();
         System.out.println("API Héros disponible sur http://localhost:" + port);
+    }
+
+    private static void handleRegistration(HttpExchange exchange, RegisterPlayerUseCase registerPlayer)
+            throws IOException {
+        try (exchange) {
+            if (!"/players".equals(exchange.getRequestURI().getPath())) {
+                sendError(exchange, 404, "Route introuvable.");
+                return;
+            }
+            if (!"POST".equals(exchange.getRequestMethod())) {
+                exchange.getResponseHeaders().set("Allow", "POST");
+                sendError(exchange, 405, "Méthode non autorisée.");
+                return;
+            }
+
+            RegisterPlayerUseCase.PlayerOutput player;
+            try {
+                Map<String, Object> body = JsonObject.parse(
+                        new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8));
+                player = registerPlayer.execute(stringField(body, "pseudonym"),
+                        stringField(body, "email"), stringField(body, "password"));
+            } catch (IllegalArgumentException invalidBody) {
+                sendError(exchange, 400, "INVALID_REQUEST");
+                return;
+            } catch (RegisterPlayerUseCase.Rejected rejected) {
+                int status = switch (rejected.getMessage()) {
+                    case "PSEUDONYM_TAKEN", "EMAIL_TAKEN" -> 409;
+                    case "PASSWORD_TOO_SHORT" -> 422;
+                    default -> 400;
+                };
+                sendError(exchange, status, rejected.getMessage());
+                return;
+            }
+
+            exchange.getResponseHeaders().set("Location", "/players/" + player.id());
+            sendJson(exchange, 201, "{\"id\":" + quote(player.id())
+                    + ",\"pseudonym\":" + quote(player.pseudonym())
+                    + ",\"email\":" + quote(player.email()) + "}");
+        }
+    }
+
+    private static void handleSignIn(HttpExchange exchange, PlayerSessions sessions) throws IOException {
+        try (exchange) {
+            if (!"/sessions".equals(exchange.getRequestURI().getPath())) {
+                sendError(exchange, 404, "Route introuvable.");
+                return;
+            }
+            if (!"POST".equals(exchange.getRequestMethod())) {
+                exchange.getResponseHeaders().set("Allow", "POST");
+                sendError(exchange, 405, "Méthode non autorisée.");
+                return;
+            }
+
+            Optional<PlayerSessions.Session> session;
+            try {
+                Map<String, Object> body = JsonObject.parse(
+                        new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8));
+                session = sessions.signIn(stringField(body, "email"), stringField(body, "password"));
+            } catch (IllegalArgumentException invalidBody) {
+                sendError(exchange, 400, "INVALID_REQUEST");
+                return;
+            }
+
+            if (session.isEmpty()) {
+                sendError(exchange, 401, "INVALID_CREDENTIALS");
+                return;
+            }
+            exchange.getResponseHeaders().set("Cache-Control", "no-store");
+            sendJson(exchange, 201, "{\"playerId\":" + quote(session.get().playerId())
+                    + ",\"token\":" + quote(session.get().token()) + "}");
+        }
     }
 
     private void handleRequest(HttpExchange exchange) throws IOException {
