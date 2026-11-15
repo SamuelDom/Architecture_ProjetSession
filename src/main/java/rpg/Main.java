@@ -59,7 +59,7 @@ public final class Main {
         Armor armor = new Armor("Armure légère", 12, true, ArmorCategory.LIGHT);
         hero.inventory().add(weapon);
         hero.inventory().add(armor);
-        hero.inventory().add(new Potion("Potion de soin", "2d4", 2));
+        hero.inventory().add(new Potion("Potion de soin", 4, 2));
         hero.equipment().equip(weapon, hero.inventory(), hero.heroClass());
         hero.equipment().equip(armor, hero.inventory(), hero.heroClass());
         return hero;
