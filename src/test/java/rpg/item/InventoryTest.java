@@ -17,7 +17,7 @@ class InventoryTest {
         assertFalse(inventory.contains(sword));
 
         for (int index = 0; index < 10; index++) {
-            inventory.add(new Potion("Potion de soin", "2d4", 2));
+            inventory.add(new Potion("Potion de soin", 4, 2));
         }
         assertTrue(inventory.isFull());
         assertEquals(10, inventory.size());
