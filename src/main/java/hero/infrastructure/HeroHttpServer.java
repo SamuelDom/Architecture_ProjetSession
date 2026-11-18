@@ -1,5 +1,7 @@
 package hero.infrastructure;
 
+import rpg.lobby.application.GetLobbyDetailsUseCase;
+import rpg.lobby.application.ListAvailableLobbiesUseCase;
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpServer;
 import config.ApplicationContext;
@@ -29,17 +31,35 @@ public final class HeroHttpServer {
     private final CreateHeroUseCase createHeroUseCase;
     private final GetHeroUseCase getHeroUseCase;
 
-    public HeroHttpServer(int port, CreateHeroUseCase createHeroUseCase,
-                          GetHeroUseCase getHeroUseCase, RegisterPlayerUseCase registerPlayer,
-                          PlayerSessions sessions) throws IOException {
-        this.server = HttpServer.create(new InetSocketAddress(port), 0);
-        this.createHeroUseCase = createHeroUseCase;
-        this.getHeroUseCase = getHeroUseCase;
-        var heroes = server.createContext("/heroes", this::handleRequest);
-        heroes.setAuthenticator(new PlayerAuthentication(sessions));
-        server.createContext("/players", exchange -> handleRegistration(exchange, registerPlayer));
-        server.createContext("/sessions", exchange -> handleSignIn(exchange, sessions));
-    }
+    public HeroHttpServer(
+        int port,
+        CreateHeroUseCase createHeroUseCase,
+        GetHeroUseCase getHeroUseCase,
+        RegisterPlayerUseCase registerPlayer,
+        PlayerSessions sessions,
+        ListAvailableLobbiesUseCase listAvailableLobbies,
+        GetLobbyDetailsUseCase getLobbyDetails) throws IOException {
+
+    this.server = HttpServer.create(new InetSocketAddress(port), 0);
+    this.createHeroUseCase = createHeroUseCase;
+    this.getHeroUseCase = getHeroUseCase;
+
+    var heroes = server.createContext("/heroes", this::handleRequest);
+    heroes.setAuthenticator(new PlayerAuthentication(sessions));
+
+    server.createContext(
+            "/players",
+            exchange -> handleRegistration(exchange, registerPlayer));
+
+    server.createContext(
+            "/sessions",
+            exchange -> handleSignIn(exchange, sessions));
+
+    var lobbies = server.createContext(
+            "/lobbies",
+            new LobbyHttpHandler(listAvailableLobbies, getLobbyDetails));
+    lobbies.setAuthenticator(new PlayerAuthentication(sessions));
+}
 
     public void start() {
         server.start();

@@ -9,8 +9,13 @@ public final class Characteristics {
     private final int wisdom;
     private final int charisma;
 
-    public Characteristics(int strength, int dexterity, int constitution,
-                           int intelligence, int wisdom, int charisma) {
+    public Characteristics(
+            int strength,
+            int dexterity,
+            int constitution,
+            int intelligence,
+            int wisdom,
+            int charisma) {
         this.strength = strength;
         this.dexterity = dexterity;
         this.constitution = constitution;
@@ -19,11 +24,31 @@ public final class Characteristics {
         this.charisma = charisma;
     }
 
+    public int strength() {
+        return strength;
+    }
+
+    public int dexterity() {
+        return dexterity;
+    }
+
     public int constitution() {
         return constitution;
     }
 
-    /** (valeur - 10) / 2 arrondi vers le bas (floorDiv, car / tronque vers zéro). */
+    public int intelligence() {
+        return intelligence;
+    }
+
+    public int wisdom() {
+        return wisdom;
+    }
+
+    public int charisma() {
+        return charisma;
+    }
+
+    /** Calcule le modificateur selon la formule (valeur - 10) / 2. */
     public int modifierOf(int rawValue) {
         return Math.floorDiv(rawValue - 10, 2);
     }

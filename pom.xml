@@ -28,23 +28,11 @@
     </dependencies>
 
     <build>
-        <sourceDirectory>${project.basedir}</sourceDirectory>
         <plugins>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-compiler-plugin</artifactId>
                 <version>3.13.0</version>
-                <configuration>
-                    <includes>
-                        <include>Main.java</include>
-                        <include>config/**/*.java</include>
-                        <include>heros/**/*.java</include>
-                        <include>src/main/java/rpg/**/*.java</include>
-                    </includes>
-                    <testIncludes>
-                        <testInclude>**/*.java</testInclude>
-                    </testIncludes>
-                </configuration>
             </plugin>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
