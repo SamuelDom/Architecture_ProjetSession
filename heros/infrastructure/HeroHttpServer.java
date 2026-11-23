@@ -1,16 +1,18 @@
-package hero.infrastructure;
+package heros.infrastructure;
 
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpServer;
 import config.ApplicationContext;
-import hero.application.CreateHeroCommand;
-import hero.application.CreateHeroUseCase;
-import hero.application.GetHeroUseCase;
-import hero.application.HeroOutput;
-import hero.domain.HeroClass;
-import hero.domain.Species;
-import hero.domain.exception.DomainException;
-import hero.domain.exception.HeroNameAlreadyTakenException;
+import heros.application.CreateHeroCommand;
+import heros.application.CreateHeroUseCase;
+import heros.application.GetHeroUseCase;
+import heros.application.HeroOutput;
+import heros.domain.HeroClass;
+import heros.domain.Species;
+import heros.domain.exception.DomainException;
+import heros.domain.exception.HeroNameAlreadyTakenException;
+import lobbies.application.CreateLobbyUseCase;
+import lobbies.infrastructure.LobbyHttpHandler;
 
 import java.io.IOException;
 import java.io.OutputStream;
@@ -27,11 +29,13 @@ public final class HeroHttpServer {
     private final GetHeroUseCase getHeroUseCase;
 
     public HeroHttpServer(int port, CreateHeroUseCase createHeroUseCase,
-                          GetHeroUseCase getHeroUseCase) throws IOException {
-        this.server = HttpServer.create(new InetSocketAddress(port), 0);
-        this.createHeroUseCase = createHeroUseCase;
-        this.getHeroUseCase = getHeroUseCase;
-        server.createContext("/heroes", this::handleRequest);
+                      GetHeroUseCase getHeroUseCase,
+                      CreateLobbyUseCase createLobbyUseCase) throws IOException {
+    this.server = HttpServer.create(new InetSocketAddress(port), 0);
+    this.createHeroUseCase = createHeroUseCase;
+    this.getHeroUseCase = getHeroUseCase;
+    server.createContext("/heroes", this::handleRequest);
+    server.createContext("/lobbies", new LobbyHttpHandler(createLobbyUseCase));
     }
 
     public void start() {
@@ -42,10 +46,16 @@ public final class HeroHttpServer {
         int port = args.length == 0 ? 8080 : Integer.parseInt(args[0]);
         ApplicationContext context = new ApplicationContext();
         HeroHttpServer server = new HeroHttpServer(
-                port, context.createHeroUseCase(), context.getHeroUseCase());
+                port,
+                context.createHeroUseCase(),
+                context.getHeroUseCase(),
+                context.createLobbyUseCase()
+        );
         server.start();
         System.out.println("API Héros disponible sur http://localhost:" + port);
     }
+
+
 
     private void handleRequest(HttpExchange exchange) throws IOException {
         String path = exchange.getRequestURI().getPath();

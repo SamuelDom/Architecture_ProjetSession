@@ -1,0 +1,2689 @@
+﻿=== C:\Users\pierr\Documents\GitHub\Architecture_ProjetSession\config\ApplicationContext.java ===
+package config;
+
+import hero.application.CreateHeroUseCase;
+import hero.application.GetHeroUseCase;
+import hero.application.HeroOutputMapper;
+import hero.domain.HeroFactory;
+import hero.domain.HeroRepository;
+import hero.infrastructure.HeroHttpServer;
+import hero.infrastructure.InMemoryHeroRepository;
+import java.io.IOException;
+import lobby.application.CreateLobbyUseCase;
+import lobby.application.LobbyOutputMapper;
+import lobby.domain.LobbyFactory;
+import lobby.domain.LobbyRepository;
+import lobby.infrastructure.InMemoryLobbyRepository;
+
+public class ApplicationContext {
+
+    private final HeroRepository heroRepository = new InMemoryHeroRepository();
+    private final HeroFactory heroFactory = new HeroFactory(heroRepository);
+    private final CreateHeroUseCase createHeroUseCase =
+            new CreateHeroUseCase(heroFactory, heroRepository, new HeroOutputMapper());
+    private final GetHeroUseCase getHeroUseCase =
+            new GetHeroUseCase(heroRepository, new HeroOutputMapper());
+
+    private final LobbyRepository lobbyRepository = new InMemoryLobbyRepository();
+    private final LobbyFactory lobbyFactory = new LobbyFactory(lobbyRepository);
+    private final CreateLobbyUseCase createLobbyUseCase =
+            new CreateLobbyUseCase(lobbyFactory, lobbyRepository, new LobbyOutputMapper());
+
+    public CreateHeroUseCase createHeroUseCase() {
+        return createHeroUseCase;
+    }
+
+    public GetHeroUseCase getHeroUseCase() {
+        return getHeroUseCase;
+    }
+
+    public CreateLobbyUseCase createLobbyUseCase() {
+        return createLobbyUseCase;
+    }
+
+    public HeroHttpServer createHeroHttpServer(int port) throws IOException {
+        return new HeroHttpServer(port, createHeroUseCase, getHeroUseCase, createLobbyUseCase);
+    }
+}
+=== C:\Users\pierr\Documents\GitHub\Architecture_ProjetSession\heros\application\CreateHeroCommand.java ===
+package hero.application;
+
+import hero.domain.HeroClass;
+import hero.domain.Species;
+
+public record CreateHeroCommand(String name, Species species, HeroClass heroClass,
+                                int strength, int dexterity, int constitution,
+                                int intelligence, int wisdom, int charisma) {
+}
+=== C:\Users\pierr\Documents\GitHub\Architecture_ProjetSession\heros\application\CreateHeroUseCase.java ===
+package hero.application;
+
+import hero.domain.Characteristics;
+import hero.domain.Hero;
+import hero.domain.HeroFactory;
+import hero.domain.HeroName;
+import hero.domain.HeroRepository;
+
+/** Orchestre le cas d'utilisation : aucune rÃ¨gle mÃ©tier ici, seulement de la coordination. */
+public class CreateHeroUseCase {
+
+    private final HeroFactory heroFactory;
+    private final HeroRepository heroRepository;
+    private final HeroOutputMapper outputMapper;
+
+    public CreateHeroUseCase(HeroFactory heroFactory, HeroRepository heroRepository, HeroOutputMapper outputMapper) {
+        this.heroFactory = heroFactory;
+        this.heroRepository = heroRepository;
+        this.outputMapper = outputMapper;
+    }
+
+    public HeroOutput execute(CreateHeroCommand command) {
+        Characteristics characteristics = new Characteristics(
+                command.strength(), command.dexterity(), command.constitution(),
+                command.intelligence(), command.wisdom(), command.charisma());
+
+        Hero hero = heroFactory.create(
+                new HeroName(command.name()), command.species(), command.heroClass(), characteristics);
+
+        heroRepository.save(hero);
+        return outputMapper.toOutput(hero);
+    }
+}
+=== C:\Users\pierr\Documents\GitHub\Architecture_ProjetSession\heros\application\GetHeroUseCase.java ===
+package hero.application;
+
+import hero.domain.HeroId;
+import hero.domain.HeroRepository;
+
+import java.util.Optional;
+import java.util.UUID;
+
+public class GetHeroUseCase {
+
+    private final HeroRepository heroRepository;
+    private final HeroOutputMapper outputMapper;
+
+    public GetHeroUseCase(HeroRepository heroRepository, HeroOutputMapper outputMapper) {
+        this.heroRepository = heroRepository;
+        this.outputMapper = outputMapper;
+    }
+
+    public Optional<HeroOutput> execute(String id) {
+        HeroId heroId = new HeroId(UUID.fromString(id));
+        return heroRepository.findById(heroId).map(outputMapper::toOutput);
+    }
+}
+=== C:\Users\pierr\Documents\GitHub\Architecture_ProjetSession\heros\application\HeroOutput.java ===
+package hero.application;
+
+public record HeroOutput(String id, String name, String species, String heroClass,
+                         int level, int experience,
+                         int currentHitPoints, int maxHitPoints,
+                         int currentMagicPoints, int maxMagicPoints) {
+}
+=== C:\Users\pierr\Documents\GitHub\Architecture_ProjetSession\heros\application\HeroOutputMapper.java ===
+package hero.application;
+
+import hero.domain.Hero;
+
+public class HeroOutputMapper {
+
+    public HeroOutput toOutput(Hero hero) {
+        return new HeroOutput(
+                hero.id().toString(),
+                hero.name().value(),
+                hero.species().name(),
+                hero.heroClass().name(),
+                hero.level(),
+                hero.experience(),
+                hero.currentHitPoints(),
+                hero.maxHitPoints(),
+                hero.currentMagicPoints(),
+                hero.maxMagicPoints());
+    }
+}
+=== C:\Users\pierr\Documents\GitHub\Architecture_ProjetSession\heros\domain\exception\DomainException.java ===
+package hero.domain.exception;
+
+
+public abstract class DomainException extends RuntimeException {
+    protected DomainException(String message) {
+        super(message);
+    }
+}
+=== C:\Users\pierr\Documents\GitHub\Architecture_ProjetSession\heros\domain\exception\HeroNameAlreadyTakenException.java ===
+package hero.domain.exception;
+
+public class HeroNameAlreadyTakenException extends DomainException {
+    public HeroNameAlreadyTakenException(String name) {
+        super("Le nom de hÃ©ros \"" + name + "\" est dÃ©jÃ  utilisÃ©.");
+    }
+}
+=== C:\Users\pierr\Documents\GitHub\Architecture_ProjetSession\heros\domain\exception\InvalidHeroNameException.java ===
+package hero.domain.exception;
+
+public class InvalidHeroNameException extends DomainException {
+    public InvalidHeroNameException(String message) {
+        super(message);
+    }
+}
+=== C:\Users\pierr\Documents\GitHub\Architecture_ProjetSession\heros\domain\Characteristics.java ===
+package hero.domain;
+
+public final class Characteristics {
+
+    private final int strength;
+    private final int dexterity;
+    private final int constitution;
+    private final int intelligence;
+    private final int wisdom;
+    private final int charisma;
+
+    public Characteristics(int strength, int dexterity, int constitution,
+                           int intelligence, int wisdom, int charisma) {
+        this.strength = strength;
+        this.dexterity = dexterity;
+        this.constitution = constitution;
+        this.intelligence = intelligence;
+        this.wisdom = wisdom;
+        this.charisma = charisma;
+    }
+
+    public int constitution() {
+        return constitution;
+    }
+
+    /** (valeur - 10) / 2 arrondi vers le bas (floorDiv, car / tronque vers zÃ©ro). */
+    public int modifierOf(int rawValue) {
+        return Math.floorDiv(rawValue - 10, 2);
+    }
+
+    public int constitutionModifier() {
+        return modifierOf(constitution);
+    }
+}
+=== C:\Users\pierr\Documents\GitHub\Architecture_ProjetSession\heros\domain\Hero.java ===
+package hero.domain;
+
+import java.util.Objects;
+
+public final class Hero {
+
+    private final HeroId id;
+    private final HeroName name;
+    private final Species species;
+    private final HeroClass heroClass;
+    private final Characteristics characteristics;
+
+    private int level;
+    private int experience;
+
+    private final int maxHitPoints;
+    private int currentHitPoints;
+    private final int maxMagicPoints;
+    private int currentMagicPoints;
+
+    Hero(HeroId id, HeroName name, Species species, HeroClass heroClass, Characteristics characteristics) {
+        this.id = Objects.requireNonNull(id);
+        this.name = Objects.requireNonNull(name);
+        this.species = Objects.requireNonNull(species);
+        this.heroClass = Objects.requireNonNull(heroClass);
+        this.characteristics = Objects.requireNonNull(characteristics);
+
+        this.level = 1;
+        this.experience = 0;
+
+        // PV max niveau 1 = PV de base + modificateur de Constitution, minimum 1
+        this.maxHitPoints = Math.max(1, heroClass.basePv() + characteristics.constitutionModifier());
+        this.currentHitPoints = this.maxHitPoints;
+
+        this.maxMagicPoints = heroClass.baseMagic();
+        this.currentMagicPoints = this.maxMagicPoints;
+    }
+
+    public HeroId id() { return id; }
+    public HeroName name() { return name; }
+    public Species species() { return species; }
+    public HeroClass heroClass() { return heroClass; }
+    public int level() { return level; }
+    public int experience() { return experience; }
+    public int maxHitPoints() { return maxHitPoints; }
+    public int currentHitPoints() { return currentHitPoints; }
+    public int maxMagicPoints() { return maxMagicPoints; }
+    public int currentMagicPoints() { return currentMagicPoints; }
+
+    public boolean isDefeated() {
+        return currentHitPoints == 0;
+    }
+
+    public void takeDamage(int amount) {
+        if (amount < 0) {
+            throw new IllegalArgumentException("Les dÃ©gÃ¢ts ne peuvent pas Ãªtre nÃ©gatifs.");
+        }
+        currentHitPoints = Math.max(0, currentHitPoints - amount);
+    }
+
+    public void heal(int amount) {
+        if (amount < 0) {
+            throw new IllegalArgumentException("Le soin ne peut pas Ãªtre nÃ©gatif.");
+        }
+        currentHitPoints = Math.min(maxHitPoints, currentHitPoints + amount);
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (!(o instanceof Hero other)) return false;
+        return id.equals(other.id);
+    }
+
+    @Override
+    public int hashCode() {
+        return id.hashCode();
+    }
+}
+=== C:\Users\pierr\Documents\GitHub\Architecture_ProjetSession\heros\domain\HeroClass.java ===
+package hero.domain;
+
+public enum HeroClass {
+    WARRIOR(12, 0),
+    RANGER(10, 0),
+    MAGE(6, 10),
+    CLERIC(10, 8);
+
+    private final int basePv;
+    private final int baseMagic;
+
+    HeroClass(int basePv, int baseMagic) {
+        this.basePv = basePv;
+        this.baseMagic = baseMagic;
+    }
+
+    public int basePv() {
+        return basePv;
+    }
+
+    public int baseMagic() {
+        return baseMagic;
+    }
+}
+=== C:\Users\pierr\Documents\GitHub\Architecture_ProjetSession\heros\domain\HeroFactory.java ===
+package hero.domain;
+
+import hero.domain.exception.HeroNameAlreadyTakenException;
+
+import java.util.UUID;
+
+/** VÃ©rifie l'unicitÃ© du nom et gÃ©nÃ¨re l'identifiant. */
+public class HeroFactory {
+
+    private final HeroRepository heroRepository;
+
+    public HeroFactory(HeroRepository heroRepository) {
+        this.heroRepository = heroRepository;
+    }
+
+    public Hero create(HeroName name, Species species, HeroClass heroClass, Characteristics characteristics) {
+        if (heroRepository.existsByName(name)) {
+            throw new HeroNameAlreadyTakenException(name.value());
+        }
+        return new Hero(new HeroId(UUID.randomUUID()), name, species, heroClass, characteristics);
+    }
+}
+=== C:\Users\pierr\Documents\GitHub\Architecture_ProjetSession\heros\domain\HeroId.java ===
+package hero.domain;
+
+import java.util.Objects;
+import java.util.UUID;
+
+/** Value Object : identifiant d'un hÃ©ros (Ã©vite de passer des UUID "nus" partout). */
+public final class HeroId {
+
+    private final UUID value;
+
+    public HeroId(UUID value) {
+        this.value = Objects.requireNonNull(value, "L'identifiant du hÃ©ros est requis.");
+    }
+
+    public UUID value() {
+        return value;
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (!(o instanceof HeroId other)) return false;
+        return value.equals(other.value);
+    }
+
+    @Override
+    public int hashCode() {
+        return value.hashCode();
+    }
+
+    @Override
+    public String toString() {
+        return value.toString();
+    }
+}
+=== C:\Users\pierr\Documents\GitHub\Architecture_ProjetSession\heros\domain\HeroName.java ===
+package hero.domain;
+
+import hero.domain.exception.InvalidHeroNameException;
+
+import java.util.regex.Pattern;
+
+
+public final class HeroName {
+
+    private static final int MIN_LENGTH = 2;
+    private static final int MAX_LENGTH = 30;
+    private static final Pattern VALID_CHARACTERS = Pattern.compile("^[A-Za-zÃ€-Ã–Ã˜-Ã¶Ã¸-Ã¿ ]+$");
+
+    private final String value;
+
+    public HeroName(String value) {
+        if (value == null) {
+            throw new InvalidHeroNameException("Le nom du hÃ©ros est requis.");
+        }
+        if (value.length() < MIN_LENGTH || value.length() > MAX_LENGTH) {
+            throw new InvalidHeroNameException(
+                    "Le nom doit contenir entre " + MIN_LENGTH + " et " + MAX_LENGTH + " caractÃ¨res.");
+        }
+        if (value.startsWith(" ") || value.endsWith(" ")) {
+            throw new InvalidHeroNameException("Le nom ne peut pas commencer ou se terminer par un espace.");
+        }
+        if (!VALID_CHARACTERS.matcher(value).matches()) {
+            throw new InvalidHeroNameException("Le nom ne peut contenir que des lettres et des espaces.");
+        }
+        this.value = value;
+    }
+
+    public String value() {
+        return value;
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (!(o instanceof HeroName other)) return false;
+        return value.equals(other.value);
+    }
+
+    @Override
+    public int hashCode() {
+        return value.hashCode();
+    }
+
+    @Override
+    public String toString() {
+        return value;
+    }
+}
+=== C:\Users\pierr\Documents\GitHub\Architecture_ProjetSession\heros\domain\HeroRepository.java ===
+package hero.domain;
+
+import java.util.Optional;
+
+/** Port : le domaine dÃ©crit ce dont il a besoin, l'infrastructure fournit l'implÃ©mentation. */
+public interface HeroRepository {
+
+    void save(Hero hero);
+
+    Optional<Hero> findById(HeroId id);
+
+    boolean existsByName(HeroName name);
+}
+=== C:\Users\pierr\Documents\GitHub\Architecture_ProjetSession\heros\domain\Species.java ===
+package hero.domain;
+
+public enum Species {
+    HUMAN,
+    ELF,
+    DWARF,
+    ORC
+}
+=== C:\Users\pierr\Documents\GitHub\Architecture_ProjetSession\heros\infrastructure\HeroHttpServer.java ===
+package hero.infrastructure;
+
+import com.sun.net.httpserver.HttpExchange;
+import com.sun.net.httpserver.HttpServer;
+import config.ApplicationContext;
+import hero.application.CreateHeroCommand;
+import hero.application.CreateHeroUseCase;
+import hero.application.GetHeroUseCase;
+import hero.application.HeroOutput;
+import hero.domain.HeroClass;
+import hero.domain.Species;
+import hero.domain.exception.DomainException;
+import hero.domain.exception.HeroNameAlreadyTakenException;
+import lobby.application.CreateLobbyUseCase;
+import lobby.infrastructure.LobbyHttpHandler;
+
+import java.io.IOException;
+import java.io.OutputStream;
+import java.net.InetSocketAddress;
+import java.nio.charset.StandardCharsets;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Optional;
+
+public final class HeroHttpServer {
+
+    private final HttpServer server;
+    private final CreateHeroUseCase createHeroUseCase;
+    private final GetHeroUseCase getHeroUseCase;
+
+    public HeroHttpServer(int port, CreateHeroUseCase createHeroUseCase,
+                      GetHeroUseCase getHeroUseCase,
+                      CreateLobbyUseCase createLobbyUseCase) throws IOException {
+    this.server = HttpServer.create(new InetSocketAddress(port), 0);
+    this.createHeroUseCase = createHeroUseCase;
+    this.getHeroUseCase = getHeroUseCase;
+    server.createContext("/heroes", this::handleRequest);
+    server.createContext("/lobbies", new LobbyHttpHandler(createLobbyUseCase));
+    }
+
+    public void start() {
+        server.start();
+    }
+
+    public static void main(String[] args) throws IOException {
+        int port = args.length == 0 ? 8080 : Integer.parseInt(args[0]);
+        ApplicationContext context = new ApplicationContext();
+        HeroHttpServer server = new HeroHttpServer(
+                port, context.createHeroUseCase(), context.getHeroUseCase());
+        server.start();
+        System.out.println("API HÃ©ros disponible sur http://localhost:" + port);
+    }
+
+    private void handleRequest(HttpExchange exchange) throws IOException {
+        String path = exchange.getRequestURI().getPath();
+        String method = exchange.getRequestMethod();
+
+        try {
+            if ("POST".equals(method) && "/heroes".equals(path)) {
+                createHero(exchange);
+                return;
+            }
+            if ("GET".equals(method) && path.startsWith("/heroes/")) {
+                getHero(exchange, path.substring("/heroes/".length()));
+                return;
+            }
+            if ("GET".equals(method) || "POST".equals(method)) {
+                sendError(exchange, 404, "Route introuvable.");
+                return;
+            }
+            exchange.getResponseHeaders().set("Allow", "GET, POST");
+            sendError(exchange, 405, "MÃ©thode non autorisÃ©e.");
+        } catch (HeroNameAlreadyTakenException exception) {
+            sendError(exchange, 409, exception.getMessage());
+        } catch (DomainException | IllegalArgumentException exception) {
+            sendError(exchange, 400, exception.getMessage());
+        }
+    }
+
+    private void createHero(HttpExchange exchange) throws IOException {
+        Map<String, Object> body = JsonObject.parse(
+                new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8));
+        CreateHeroCommand command = new CreateHeroCommand(
+                stringField(body, "name"),
+                Species.valueOf(stringField(body, "species")),
+                HeroClass.valueOf(stringField(body, "heroClass")),
+                integerField(body, "strength"),
+                integerField(body, "dexterity"),
+                integerField(body, "constitution"),
+                integerField(body, "intelligence"),
+                integerField(body, "wisdom"),
+                integerField(body, "charisma"));
+
+        HeroOutput hero = createHeroUseCase.execute(command);
+        exchange.getResponseHeaders().set("Location", "/heroes/" + hero.id());
+        sendJson(exchange, 201, serialize(hero));
+    }
+
+    private void getHero(HttpExchange exchange, String id) throws IOException {
+        if (id.isEmpty() || id.contains("/")) {
+            sendError(exchange, 400, "Identifiant de hÃ©ros invalide.");
+            return;
+        }
+        Optional<HeroOutput> hero = getHeroUseCase.execute(id);
+        if (hero.isEmpty()) {
+            sendError(exchange, 404, "HÃ©ros introuvable.");
+            return;
+        }
+        sendJson(exchange, 200, serialize(hero.get()));
+    }
+
+    private static String stringField(Map<String, Object> body, String name) {
+        Object value = body.get(name);
+        if (!(value instanceof String text)) {
+            throw new IllegalArgumentException("Le champ '" + name + "' doit Ãªtre une chaÃ®ne.");
+        }
+        return text;
+    }
+
+    private static int integerField(Map<String, Object> body, String name) {
+        Object value = body.get(name);
+        if (!(value instanceof Integer number)) {
+            throw new IllegalArgumentException("Le champ '" + name + "' doit Ãªtre un entier.");
+        }
+        return number;
+    }
+
+    private static String serialize(HeroOutput hero) {
+        return "{"
+                + "\"id\":" + quote(hero.id()) + ","
+                + "\"name\":" + quote(hero.name()) + ","
+                + "\"species\":" + quote(hero.species()) + ","
+                + "\"heroClass\":" + quote(hero.heroClass()) + ","
+                + "\"level\":" + hero.level() + ","
+                + "\"experience\":" + hero.experience() + ","
+                + "\"currentHitPoints\":" + hero.currentHitPoints() + ","
+                + "\"maxHitPoints\":" + hero.maxHitPoints() + ","
+                + "\"currentMagicPoints\":" + hero.currentMagicPoints() + ","
+                + "\"maxMagicPoints\":" + hero.maxMagicPoints()
+                + "}";
+    }
+
+    private static String quote(String value) {
+        StringBuilder json = new StringBuilder("\"");
+        for (int index = 0; index < value.length(); index++) {
+            char character = value.charAt(index);
+            switch (character) {
+                case '"' -> json.append("\\\"");
+                case '\\' -> json.append("\\\\");
+                case '\b' -> json.append("\\b");
+                case '\f' -> json.append("\\f");
+                case '\n' -> json.append("\\n");
+                case '\r' -> json.append("\\r");
+                case '\t' -> json.append("\\t");
+                default -> {
+                    if (character < 0x20) {
+                        json.append(String.format("\\u%04x", (int) character));
+                    } else {
+                        json.append(character);
+                    }
+                }
+            }
+        }
+        return json.append('"').toString();
+    }
+
+    private static void sendError(HttpExchange exchange, int status, String message) throws IOException {
+        sendJson(exchange, status, "{\"error\":" + quote(message == null ? "RequÃªte invalide." : message) + "}");
+    }
+
+    private static void sendJson(HttpExchange exchange, int status, String body) throws IOException {
+        byte[] response = body.getBytes(StandardCharsets.UTF_8);
+        exchange.getResponseHeaders().set("Content-Type", "application/json; charset=utf-8");
+        exchange.sendResponseHeaders(status, response.length);
+        try (OutputStream output = exchange.getResponseBody()) {
+            output.write(response);
+        }
+    }
+
+    private static final class JsonObject {
+        private final String source;
+        private int index;
+
+        private JsonObject(String source) {
+            this.source = source;
+        }
+
+        static Map<String, Object> parse(String source) {
+            return new JsonObject(source).parseObject();
+        }
+
+        private Map<String, Object> parseObject() {
+            Map<String, Object> values = new HashMap<>();
+            skipWhitespace();
+            expect('{');
+            skipWhitespace();
+            if (consume('}')) {
+                ensureFinished();
+                return values;
+            }
+            while (true) {
+                skipWhitespace();
+                String key = parseString();
+                skipWhitespace();
+                expect(':');
+                skipWhitespace();
+                Object value = peek() == '"' ? parseString() : parseInteger();
+                if (values.putIfAbsent(key, value) != null) {
+                    throw invalidJson();
+                }
+                skipWhitespace();
+                if (consume('}')) {
+                    ensureFinished();
+                    return values;
+                }
+                expect(',');
+            }
+        }
+
+        private String parseString() {
+            expect('"');
+            StringBuilder value = new StringBuilder();
+            while (index < source.length()) {
+                char character = source.charAt(index++);
+                if (character == '"') {
+                    return value.toString();
+                }
+                if (character < 0x20) {
+                    throw invalidJson();
+                }
+                if (character != '\\') {
+                    value.append(character);
+                    continue;
+                }
+                if (index >= source.length()) {
+                    throw invalidJson();
+                }
+                char escaped = source.charAt(index++);
+                switch (escaped) {
+                    case '"', '\\', '/' -> value.append(escaped);
+                    case 'b' -> value.append('\b');
+                    case 'f' -> value.append('\f');
+                    case 'n' -> value.append('\n');
+                    case 'r' -> value.append('\r');
+                    case 't' -> value.append('\t');
+                    case 'u' -> value.append(parseUnicodeEscape());
+                    default -> throw invalidJson();
+                }
+            }
+            throw invalidJson();
+        }
+
+        private char parseUnicodeEscape() {
+            if (index + 4 > source.length()) {
+                throw invalidJson();
+            }
+            try {
+                char value = (char) Integer.parseInt(source.substring(index, index + 4), 16);
+                index += 4;
+                return value;
+            } catch (NumberFormatException exception) {
+                throw invalidJson();
+            }
+        }
+
+        private Integer parseInteger() {
+            int start = index;
+            if (peek() == '-') {
+                index++;
+            }
+            while (index < source.length() && Character.isDigit(source.charAt(index))) {
+                index++;
+            }
+            if (start == index || (source.charAt(start) == '-' && start + 1 == index)) {
+                throw invalidJson();
+            }
+            try {
+                return Integer.valueOf(source.substring(start, index));
+            } catch (NumberFormatException exception) {
+                throw invalidJson();
+            }
+        }
+
+        private void skipWhitespace() {
+            while (index < source.length()) {
+                char character = source.charAt(index);
+                if (character != ' ' && character != '\n' && character != '\r' && character != '\t') {
+                    return;
+                }
+                index++;
+            }
+        }
+
+        private char peek() {
+            return index < source.length() ? source.charAt(index) : '\0';
+        }
+
+        private boolean consume(char expected) {
+            if (peek() != expected) {
+                return false;
+            }
+            index++;
+            return true;
+        }
+
+        private void expect(char expected) {
+            if (!consume(expected)) {
+                throw invalidJson();
+            }
+        }
+
+        private void ensureFinished() {
+            skipWhitespace();
+            if (index != source.length()) {
+                throw invalidJson();
+            }
+        }
+
+        private IllegalArgumentException invalidJson() {
+            return new IllegalArgumentException("Le corps doit Ãªtre un objet JSON valide.");
+        }
+    }
+}
+=== C:\Users\pierr\Documents\GitHub\Architecture_ProjetSession\heros\infrastructure\InMemoryHeroRepository.java ===
+package hero.infrastructure;
+
+import hero.domain.Hero;
+import hero.domain.HeroId;
+import hero.domain.HeroName;
+import hero.domain.HeroRepository;
+
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Optional;
+
+public class InMemoryHeroRepository implements HeroRepository {
+
+    private final Map<HeroId, Hero> heroes = new HashMap<>();
+
+    @Override
+    public void save(Hero hero) {
+        heroes.put(hero.id(), hero);
+    }
+
+    @Override
+    public Optional<Hero> findById(HeroId id) {
+        return Optional.ofNullable(heroes.get(id));
+    }
+
+    @Override
+    public boolean existsByName(HeroName name) {
+        return heroes.values().stream().anyMatch(hero -> hero.name().equals(name));
+    }
+}
+=== C:\Users\pierr\Documents\GitHub\Architecture_ProjetSession\lobbies\application\CreateLobbyCommand.java ===
+package lobby.application;
+
+public record CreateLobbyCommand(String playerId) {
+}
+=== C:\Users\pierr\Documents\GitHub\Architecture_ProjetSession\lobbies\application\CreateLobbyUseCase.java ===
+package lobby.application;
+
+import hero.domain.HeroId;
+import java.util.Objects;
+import java.util.UUID;
+import lobby.domain.Lobby;
+import lobby.domain.LobbyFactory;
+import lobby.domain.LobbyRepository;
+
+public class CreateLobbyUseCase {
+    private final LobbyFactory lobbyFactory;
+    private final LobbyRepository lobbyRepository;
+    private final LobbyOutputMapper outputMapper;
+
+    public CreateLobbyUseCase(LobbyFactory lobbyFactory,
+                              LobbyRepository lobbyRepository,
+                              LobbyOutputMapper outputMapper) {
+        this.lobbyFactory = Objects.requireNonNull(lobbyFactory);
+        this.lobbyRepository = Objects.requireNonNull(lobbyRepository);
+        this.outputMapper = Objects.requireNonNull(outputMapper);
+    }
+
+    public LobbyOutput execute(CreateLobbyCommand command) {
+        Objects.requireNonNull(command, "La commande est requise.");
+        if (command.playerId() == null || command.playerId().isBlank()) {
+            throw new IllegalArgumentException("L'identifiant du joueur connectÃ© est requis.");
+        }
+        HeroId hostId = new HeroId(UUID.fromString(command.playerId()));
+        Lobby lobby = lobbyFactory.create(hostId);
+        lobbyRepository.save(lobby);
+        return outputMapper.toOutput(lobby);
+    }
+}
+=== C:\Users\pierr\Documents\GitHub\Architecture_ProjetSession\lobbies\application\LobbyOutput.java ===
+package lobby.application;
+
+import java.util.List;
+
+public record LobbyOutput(
+        String id,
+        String hostId,
+        List<String> members,
+        int availableSeats,
+        String status) {
+}
+=== C:\Users\pierr\Documents\GitHub\Architecture_ProjetSession\lobbies\application\LobbyOutputMapper.java ===
+package lobby.application;
+
+import lobby.domain.Lobby;
+
+public class LobbyOutputMapper {
+    public LobbyOutput toOutput(Lobby lobby) {
+        return new LobbyOutput(
+                lobby.id().toString(),
+                lobby.hostId().toString(),
+                lobby.members().stream().map(Object::toString).toList(),
+                lobby.availableSeats(),
+                lobby.status().name()
+        );
+    }
+}
+=== C:\Users\pierr\Documents\GitHub\Architecture_ProjetSession\lobbies\domain\exception\AlreadyInLobbyException.java ===
+package lobby.domain.exception;
+
+import hero.domain.exception.DomainException;
+
+public class AlreadyInLobbyException extends DomainException {
+    public AlreadyInLobbyException(String playerId) {
+        super("Le joueur \"" + playerId + "\" est dÃ©jÃ  membre d'un lobby ouvert.");
+    }
+}
+=== C:\Users\pierr\Documents\GitHub\Architecture_ProjetSession\lobbies\domain\Lobby.java ===
+package lobby.domain;
+
+import hero.domain.HeroId;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+import java.util.Objects;
+
+public final class Lobby {
+    public static final int MAX_CAPACITY = 4;
+
+    private final LobbyId id;
+    private final HeroId hostId;
+    private final List<HeroId> members;
+    private LobbyStatus status;
+
+    Lobby(LobbyId id, HeroId hostId) {
+        this.id = Objects.requireNonNull(id, "L'identifiant du lobby est requis.");
+        this.hostId = Objects.requireNonNull(hostId, "L'identifiant de l'hÃ´te est requis.");
+        this.members = new ArrayList<>();
+        this.members.add(hostId);
+        this.status = LobbyStatus.OPEN;
+    }
+
+    public LobbyId id() { return id; }
+    public HeroId hostId() { return hostId; }
+    public LobbyStatus status() { return status; }
+
+    public List<HeroId> members() {
+        return Collections.unmodifiableList(members);
+    }
+
+    public int availableSeats() {
+        return MAX_CAPACITY - members.size();
+    }
+
+    public boolean isOpen() {
+        return status == LobbyStatus.OPEN;
+    }
+
+    public boolean hasMember(HeroId playerId) {
+        return members.contains(playerId);
+    }
+}
+=== C:\Users\pierr\Documents\GitHub\Architecture_ProjetSession\lobbies\domain\LobbyFactory.java ===
+package lobby.domain;
+
+import hero.domain.HeroId;
+import java.util.Objects;
+import lobby.domain.exception.AlreadyInLobbyException;
+
+public class LobbyFactory {
+    private final LobbyRepository lobbyRepository;
+
+    public LobbyFactory(LobbyRepository lobbyRepository) {
+        this.lobbyRepository = Objects.requireNonNull(lobbyRepository);
+    }
+
+    public Lobby create(HeroId hostId) {
+        Objects.requireNonNull(hostId, "L'identifiant du joueur est requis.");
+        if (lobbyRepository.existsOpenLobbyWithMember(hostId)) {
+            throw new AlreadyInLobbyException(hostId.toString());
+        }
+        return new Lobby(lobbyRepository.nextIdentity(), hostId);
+    }
+}
+=== C:\Users\pierr\Documents\GitHub\Architecture_ProjetSession\lobbies\domain\LobbyId.java ===
+package lobby.domain;
+
+import java.util.Objects;
+
+public record LobbyId(String value) {
+    public LobbyId {
+        if (value == null || value.isBlank()) {
+            throw new IllegalArgumentException("L'identifiant du lobby est requis.");
+        }
+    }
+
+    @Override
+    public String toString() {
+        return value;
+    }
+}
+=== C:\Users\pierr\Documents\GitHub\Architecture_ProjetSession\lobbies\domain\LobbyRepository.java ===
+package lobby.domain;
+
+import hero.domain.HeroId;
+import java.util.Optional;
+
+public interface LobbyRepository {
+    LobbyId nextIdentity();
+    void save(Lobby lobby);
+    Optional<Lobby> findById(LobbyId id);
+    boolean existsOpenLobbyWithMember(HeroId playerId);
+}
+=== C:\Users\pierr\Documents\GitHub\Architecture_ProjetSession\lobbies\domain\LobbyStatus.java ===
+package lobby.domain;
+
+public enum LobbyStatus {
+    OPEN,
+    CLOSED,
+    STARTED
+}
+=== C:\Users\pierr\Documents\GitHub\Architecture_ProjetSession\lobbies\infrastructure\InMemoryLobbyRepository.java ===
+package lobby.infrastructure;
+
+import hero.domain.HeroId;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Optional;
+import java.util.concurrent.atomic.AtomicInteger;
+import lobby.domain.Lobby;
+import lobby.domain.LobbyId;
+import lobby.domain.LobbyRepository;
+
+public class InMemoryLobbyRepository implements LobbyRepository {
+    private final Map<LobbyId, Lobby> lobbies = new HashMap<>();
+    private final AtomicInteger sequence = new AtomicInteger(0);
+
+    @Override
+    public LobbyId nextIdentity() {
+        return new LobbyId("l-" + sequence.incrementAndGet());
+    }
+
+    @Override
+    public void save(Lobby lobby) {
+        lobbies.put(lobby.id(), lobby);
+    }
+
+    @Override
+    public Optional<Lobby> findById(LobbyId id) {
+        return Optional.ofNullable(lobbies.get(id));
+    }
+
+    @Override
+    public boolean existsOpenLobbyWithMember(HeroId playerId) {
+        return lobbies.values().stream()
+                .anyMatch(lobby -> lobby.isOpen() && lobby.hasMember(playerId));
+    }
+}
+=== C:\Users\pierr\Documents\GitHub\Architecture_ProjetSession\lobbies\infrastructure\LobbyHttpHandler.java ===
+package lobby.infrastructure;
+
+import com.sun.net.httpserver.HttpExchange;
+import com.sun.net.httpserver.HttpHandler;
+import hero.domain.exception.DomainException;
+import java.io.IOException;
+import java.io.OutputStream;
+import java.nio.charset.StandardCharsets;
+import java.util.stream.Collectors;
+import lobby.application.CreateLobbyCommand;
+import lobby.application.CreateLobbyUseCase;
+import lobby.application.LobbyOutput;
+import lobby.domain.exception.AlreadyInLobbyException;
+
+public final class LobbyHttpHandler implements HttpHandler {
+
+    private final CreateLobbyUseCase createLobbyUseCase;
+
+    public LobbyHttpHandler(CreateLobbyUseCase createLobbyUseCase) {
+        this.createLobbyUseCase = createLobbyUseCase;
+    }
+
+    @Override
+    public void handle(HttpExchange exchange) throws IOException {
+        String path = exchange.getRequestURI().getPath();
+        String method = exchange.getRequestMethod();
+
+        try {
+            if ("POST".equals(method) && "/lobbies".equals(path)) {
+                createLobby(exchange);
+                return;
+            }
+            if ("GET".equals(method) || "POST".equals(method)) {
+                sendError(exchange, 404, "NOT_FOUND", "Route introuvable.");
+                return;
+            }
+            exchange.getResponseHeaders().set("Allow", "POST");
+            sendError(exchange, 405, "METHOD_NOT_ALLOWED", "MÃ©thode non autorisÃ©e.");
+        } catch (AlreadyInLobbyException exception) {
+            sendError(exchange, 409, "ALREADY_IN_LOBBY", exception.getMessage());
+        } catch (DomainException | IllegalArgumentException exception) {
+            sendError(exchange, 400, "BAD_REQUEST", exception.getMessage());
+        }
+    }
+
+    private void createLobby(HttpExchange exchange) throws IOException {
+        String playerId = exchange.getRequestHeaders().getFirst("X-Player-Id");
+        LobbyOutput lobby = createLobbyUseCase.execute(new CreateLobbyCommand(playerId));
+        exchange.getResponseHeaders().set("Location", "/lobbies/" + lobby.id());
+        sendJson(exchange, 201, serialize(lobby));
+    }
+
+    private static String serialize(LobbyOutput lobby) {
+        String membersJson = lobby.members().stream()
+                .map(LobbyHttpHandler::quote)
+                .collect(Collectors.joining(",", "[", "]"));
+
+        return "{"
+                + "\"id\":" + quote(lobby.id()) + ","
+                + "\"hostId\":" + quote(lobby.hostId()) + ","
+                + "\"members\":" + membersJson + ","
+                + "\"availableSeats\":" + lobby.availableSeats() + ","
+                + "\"status\":" + quote(lobby.status())
+                + "}";
+    }
+
+    private static String quote(String value) {
+        StringBuilder json = new StringBuilder("\"");
+        for (int index = 0; index < value.length(); index++) {
+            char character = value.charAt(index);
+            switch (character) {
+                case '"' -> json.append("\\\"");
+                case '\\' -> json.append("\\\\");
+                case '\b' -> json.append("\\b");
+                case '\f' -> json.append("\\f");
+                case '\n' -> json.append("\\n");
+                case '\r' -> json.append("\\r");
+                case '\t' -> json.append("\\t");
+                default -> {
+                    if (character < 0x20) {
+                        json.append(String.format("\\u%04x", (int) character));
+                    } else {
+                        json.append(character);
+                    }
+                }
+            }
+        }
+        return json.append('"').toString();
+    }
+
+    private static void sendError(HttpExchange exchange, int status, String code, String message) throws IOException {
+        String body = "{"
+                + "\"error\":" + quote(code) + ","
+                + "\"message\":" + quote(message == null ? "RequÃªte invalide." : message)
+                + "}";
+        sendJson(exchange, status, body);
+    }
+
+    private static void sendJson(HttpExchange exchange, int status, String body) throws IOException {
+        byte[] response = body.getBytes(StandardCharsets.UTF_8);
+        exchange.getResponseHeaders().set("Content-Type", "application/json; charset=utf-8");
+        exchange.sendResponseHeaders(status, response.length);
+        try (OutputStream output = exchange.getResponseBody()) {
+            output.write(response);
+        }
+    }
+}
+=== C:\Users\pierr\Documents\GitHub\Architecture_ProjetSession\src\main\java\rpg\combat\Attack.java ===
+package rpg.combat;
+
+import java.util.List;
+import java.util.Objects;
+import java.util.Scanner;
+import rpg.creature.Creature;
+import rpg.hero.domain.Hero;
+import rpg.item.Weapon;
+
+public final class Attack {
+    private final Dice dice;
+    private final Scanner scanner;
+
+    public Attack(Dice dice, Scanner scanner) {
+        this.dice = Objects.requireNonNull(dice);
+        this.scanner = Objects.requireNonNull(scanner);
+    }
+
+    public void targetChoice(Hero hero, List<Creature> creatures) {
+        List<Creature> availableTargets = creatures.stream().filter(Creature::isAlive).toList();
+        if (availableTargets.isEmpty()) return;
+        while (true) {
+            for (int index = 0; index < availableTargets.size(); index++) {
+                Creature target = availableTargets.get(index);
+                System.out.printf("%d. %s (PV %d/%d, CA %d)%n",
+                        index + 1, target.getNom(), target.getCurrentHealth(),
+                        target.getMaxHealth(), target.getCurrentArmor());
+            }
+            System.out.print("Choisissez une crÃ©ature Ã  attaquer : ");
+            if (!scanner.hasNextLine()) {
+                throw new IllegalStateException("La saisie a Ã©tÃ© interrompue pendant le combat.");
+            }
+            String input = scanner.nextLine().trim();
+            try {
+                int choice = Integer.parseInt(input);
+                if (choice < 1 || choice > availableTargets.size()) {
+                    System.out.println("Choix invalide. RÃ©essayez.");
+                    continue;
+                }
+                attack(hero, availableTargets.get(choice - 1));
+                return;
+            } catch (NumberFormatException exception) {
+                System.out.println("Entrez le numÃ©ro d'une cible.");
+            }
+        }
+    }
+
+    public void attack(Hero hero, Creature target) {
+        Objects.requireNonNull(hero);
+        Objects.requireNonNull(target);
+        if (!target.isAlive()) throw new IllegalStateException("Une crÃ©ature vaincue ne peut pas Ãªtre attaquÃ©e.");
+        int roll = dice.rollDiceTwenty();
+        Weapon weapon = hero.equipment().getMainWeapon();
+        int attackRoll = roll + hero.attackModifier();
+        if (roll == 1 || (roll != 20 && attackRoll < target.currentArmor())) {
+            System.out.printf("%s rate son attaque contre %s.%n", hero.name(), target.getNom());
+            return;
+        }
+
+        int damageDice = weapon == null ? 8 : weapon.getDamageDice();
+        int damage = dice.rollDice(damageDice) + hero.attackModifier();
+        if (roll == 20) {
+            damage += dice.rollDice(damageDice);
+            System.out.println("Coup critique !");
+        }
+        damage = Math.max(1, damage);
+        target.takeDamage(damage);
+        System.out.printf("%s inflige %d dÃ©gÃ¢ts Ã  %s (PV %d/%d).%n",
+                hero.name(), damage, target.getNom(), target.getCurrentHealth(), target.getMaxHealth());
+    }
+}
+=== C:\Users\pierr\Documents\GitHub\Architecture_ProjetSession\src\main\java\rpg\combat\Combat.java ===
+package rpg.combat;
+
+import java.util.ArrayList;
+import java.util.IdentityHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Scanner;
+import rpg.creature.Creature;
+import rpg.hero.domain.Hero;
+import rpg.progression.ExperienceDistributor;
+import rpg.progression.LevelTable;
+import rpg.progression.LevelUpResult;
+import rpg.progression.LevelUpService;
+
+public final class Combat {
+    private final Dice dice;
+    private final Attack attack;
+    private final Scanner scanner;
+    private final Map<Combatant, List<EffectsTemplate>> activeEffects = new IdentityHashMap<>();
+    private int roundCounter;
+
+    public Combat(Scanner scanner) {
+        this(new Dice(), scanner);
+    }
+
+    public Combat(Dice dice, Scanner scanner) {
+        this.dice = Objects.requireNonNull(dice);
+        this.scanner = Objects.requireNonNull(scanner);
+        this.attack = new Attack(dice, scanner);
+    }
+
+    public void applyEffect(Combatant target, EffectsTemplate effect) {
+        Objects.requireNonNull(target);
+        Objects.requireNonNull(effect);
+        activeEffects.computeIfAbsent(target, ignored -> new ArrayList<>()).add(effect);
+        effect.applyEffect(target);
+    }
+
+    public int roundCounter() { return roundCounter; }
+
+    public void start(List<Hero> heroes, ArrayList<Creature> creatures) {
+        if (heroes == null || heroes.isEmpty()) {
+            throw new IllegalArgumentException("Au moins un hÃ©ros est requis pour le combat.");
+        }
+        if (creatures == null || creatures.isEmpty()) {
+            throw new IllegalArgumentException("Au moins une crÃ©ature est requise pour le combat.");
+        }
+        if (heroes.stream().anyMatch(Objects::isNull) || creatures.stream().anyMatch(Objects::isNull)) {
+            throw new IllegalArgumentException("Les participants au combat ne peuvent pas Ãªtre null.");
+        }
+
+        roundCounter = 0;
+        List<Combatant> order = determineActionOrder(heroes, creatures);
+        System.out.println("DÃ©but du combat !");
+        while (hasLiving(heroes) && hasLiving(creatures)) {
+            roundCounter++;
+            System.out.println("\n=== ROUND " + roundCounter + " ===");
+            for (Combatant participant : order) {
+                if (!hasLiving(heroes) || !hasLiving(creatures)) break;
+                if (!participant.isAlive()) continue;
+                tickEffects(participant);
+                if (!participant.isAlive()) continue;
+                if (participant.isStunned()) {
+                    System.out.println(participant.nameForCombat() + " ne peut pas agir.");
+                    continue;
+                }
+                if (participant instanceof Hero hero) {
+                    attack.targetChoice(hero, creatures);
+                } else if (participant instanceof Creature creature) {
+                    attackCreature(creature, heroes);
+                }
+            }
+        }
+
+        if (hasLiving(heroes)) {
+            int totalXp = creatures.stream().mapToInt(Creature::getXp).sum();
+            int share = new ExperienceDistributor().distribute(totalXp, heroes);
+            LevelUpService levelUpService = new LevelUpService(new LevelTable());
+            for (Hero hero : heroes) {
+                LevelUpResult result = levelUpService.checkLevelUp(hero);
+                System.out.printf("%s reÃ§oit %d XP.%n", hero.name(), share);
+                if (result.leveledUp()) {
+                    System.out.printf("%s passe au niveau %d et gagne %d PV maximum.%n",
+                            hero.name(), result.newLevel(), result.hpGained());
+                }
+            }
+            System.out.println("Les hÃ©ros ont gagnÃ© !");
+        } else {
+            System.out.println("Les crÃ©atures ont gagnÃ© !");
+        }
+        System.out.println("=== FIN DU COMBAT ===");
+    }
+
+    private List<Combatant> determineActionOrder(List<Hero> heroes, List<Creature> creatures) {
+        List<Combatant> order = new ArrayList<>(heroes.size() + creatures.size());
+        order.addAll(heroes);
+        order.addAll(creatures);
+        order.sort((first, second) ->
+                Integer.compare(initiative(second), initiative(first)));
+        System.out.println("Ordre d'action : "
+                + String.join(", ", order.stream().map(Combatant::nameForCombat).toList()));
+        return order;
+    }
+
+    private int initiative(Combatant combatant) {
+        int bonus = combatant instanceof Hero hero
+                ? hero.dexterityModifier()
+                : ((Creature) combatant).getInitiative();
+        return dice.rollDiceTwenty() + bonus;
+    }
+
+    private static boolean hasLiving(List<? extends Combatant> participants) {
+        return participants.stream().anyMatch(Combatant::isAlive);
+    }
+
+    private void attackCreature(Creature creature, List<Hero> heroes) {
+        List<Hero> livingHeroes = heroes.stream().filter(Hero::isAlive).toList();
+        if (livingHeroes.isEmpty()) return;
+        Hero target = chooseCreatureTarget(creature, livingHeroes);
+        int damage = creature.testAttack();
+        target.takeDamage(damage);
+        System.out.printf("%s attaque %s et inflige %d dÃ©gÃ¢ts (PV %d/%d).%n",
+                creature.getNom(), target.name(), damage,
+                target.currentHitPoints(), target.maxHitPoints());
+    }
+
+    private Hero chooseCreatureTarget(Creature creature, List<Hero> livingHeroes) {
+        return switch (creature.getNom()) {
+            case "Gobelin" -> livingHeroes.stream()
+                    .min(java.util.Comparator.comparingInt(Hero::currentHitPoints)).orElseThrow();
+            case "Orc" -> livingHeroes.stream()
+                    .max(java.util.Comparator.comparingInt(Hero::currentHitPoints)).orElseThrow();
+            default -> livingHeroes.get(dice.rollDice(livingHeroes.size()) - 1);
+        };
+    }
+
+    private void tickEffects(Combatant target) {
+        List<EffectsTemplate> effects = activeEffects.get(target);
+        if (effects == null) return;
+        effects.removeIf(effect -> {
+            effect.onTurnStart(target);
+            if (!effect.tick()) return false;
+            effect.onRemove(target);
+            System.out.println("L'effet " + effect.getName() + " prend fin.");
+            return true;
+        });
+    }
+}
+=== C:\Users\pierr\Documents\GitHub\Architecture_ProjetSession\src\main\java\rpg\combat\Combatant.java ===
+package rpg.combat;
+
+public interface Combatant {
+    String nameForCombat();
+    int currentHitPoints();
+    int currentArmor();
+    boolean isAlive();
+    void takeDamage(int amount);
+    boolean isStunned();
+    void setStunned(boolean stunned);
+    void increaseArmor(int amount);
+    void decreaseArmor(int amount);
+}
+=== C:\Users\pierr\Documents\GitHub\Architecture_ProjetSession\src\main\java\rpg\combat\DefenseEffect.java ===
+package rpg.combat;
+
+public final class DefenseEffect extends EffectsTemplate {
+    private final int defenseBonus;
+
+    public DefenseEffect(int duration, int defenseBonus) {
+        super("DÃ©fense", duration);
+        if (defenseBonus < 0) throw new IllegalArgumentException("Le bonus de dÃ©fense ne peut pas Ãªtre nÃ©gatif.");
+        this.defenseBonus = defenseBonus;
+    }
+
+    @Override
+    public void applyEffect(Combatant target) {
+        target.increaseArmor(defenseBonus);
+        System.out.println(target.nameForCombat() + " adopte une position dÃ©fensive (+"
+                + defenseBonus + " CA).");
+    }
+
+    @Override
+    public void onRemove(Combatant target) {
+        target.decreaseArmor(defenseBonus);
+    }
+}
+=== C:\Users\pierr\Documents\GitHub\Architecture_ProjetSession\src\main\java\rpg\combat\Dice.java ===
+package rpg.combat;
+
+public final class Dice {
+    public int rollDice(int max) {
+        int min = 1;
+        if(max <=1){
+            System.out.print("le nombre de faces d'un dÃ© doit Ãªtre de minimum de 2");
+        }
+        int result = (int) (Math.random() * (max - min + 1) + min);
+        return result;
+    }
+
+    public int rollDiceFour() {
+        return rollDice(4);
+    }
+
+    public int rollDiceSix() {
+        return rollDice(6);
+    }
+
+    public int rollDiceEight() {
+        return rollDice(8);
+    }
+
+    public int rollDiceTen() {
+        return rollDice(10);
+    }
+
+    public int rollDiceTwenty(){
+        return rollDice(20);
+    }
+}
+=== C:\Users\pierr\Documents\GitHub\Architecture_ProjetSession\src\main\java\rpg\combat\EffectsTemplate.java ===
+package rpg.combat;
+
+public abstract class EffectsTemplate {
+    private final String name;
+    private int duration;
+
+    protected EffectsTemplate(String name, int duration) {
+        if (name == null || name.isBlank()) throw new IllegalArgumentException("Le nom de l'effet est requis.");
+        if (duration < 1) throw new IllegalArgumentException("La durÃ©e de l'effet doit Ãªtre positive.");
+        this.name = name;
+        this.duration = duration;
+    }
+
+    public String getName() { return name; }
+    public int getDuration() { return duration; }
+    public boolean tick() { return --duration <= 0; }
+    public void applyEffect(Combatant target) {}
+    public void onTurnStart(Combatant target) {}
+    public void onRemove(Combatant target) {}
+}
+=== C:\Users\pierr\Documents\GitHub\Architecture_ProjetSession\src\main\java\rpg\combat\PoisonEffect.java ===
+package rpg.combat;
+
+public final class PoisonEffect extends EffectsTemplate {
+    private final int damagePerTurn;
+
+    public PoisonEffect(int duration, int damagePerTurn) {
+        super("Poison", duration);
+        if (damagePerTurn < 0) throw new IllegalArgumentException("Les dÃ©gÃ¢ts de poison ne peuvent pas Ãªtre nÃ©gatifs.");
+        this.damagePerTurn = damagePerTurn;
+    }
+
+    @Override
+    public void onTurnStart(Combatant target) {
+        target.takeDamage(damagePerTurn);
+        System.out.println(target.nameForCombat() + " subit " + damagePerTurn + " dÃ©gÃ¢ts de poison.");
+    }
+}
+=== C:\Users\pierr\Documents\GitHub\Architecture_ProjetSession\src\main\java\rpg\combat\StunEffect.java ===
+package rpg.combat;
+
+public final class StunEffect extends EffectsTemplate {
+    public StunEffect(int duration) {
+        super("Ã‰tourdissement", duration);
+    }
+
+    @Override
+    public void applyEffect(Combatant target) {
+        target.setStunned(true);
+        System.out.println(target.nameForCombat() + " est Ã©tourdi.");
+    }
+
+    @Override
+    public void onRemove(Combatant target) {
+        target.setStunned(false);
+        System.out.println(target.nameForCombat() + " n'est plus Ã©tourdi.");
+    }
+}
+=== C:\Users\pierr\Documents\GitHub\Architecture_ProjetSession\src\main\java\rpg\creature\Creature.java ===
+package rpg.creature;
+
+import java.util.Objects;
+import rpg.combat.Combatant;
+import rpg.combat.Dice;
+
+public final class Creature implements Combatant {
+    private final String name;
+    private final int maxHitPoints;
+    private final int experienceReward;
+    private final int initiative;
+    private final int baseAttack;
+    private final int weaponDamage;
+    private final String weaponName;
+    private final Dice dice;
+    private int currentHitPoints;
+    private int initialArmor;
+    private int currentArmor;
+    private boolean stunned;
+
+    public Creature(String name, int maxHitPoints, int initialArmor, int experienceReward,
+                    int initiative, int baseAttack, String weaponName) {
+        if (name == null || name.isBlank()) throw new IllegalArgumentException("Le nom de la crÃ©ature est requis.");
+        if (maxHitPoints < 1 || initialArmor < 0 || experienceReward < 0) {
+            throw new IllegalArgumentException("Les PV, l'armure et l'expÃ©rience de la crÃ©ature sont invalides.");
+        }
+        this.name = name;
+        this.maxHitPoints = maxHitPoints;
+        this.currentHitPoints = maxHitPoints;
+        this.initialArmor = initialArmor;
+        this.currentArmor = initialArmor;
+        this.experienceReward = experienceReward;
+        this.initiative = initiative;
+        this.baseAttack = baseAttack;
+        this.weaponName = Objects.requireNonNull(weaponName);
+        this.weaponDamage = new CreatureWeapons().getWeaponDamage(weaponName);
+        this.dice = new Dice();
+    }
+
+    public String getNom() { return name; }
+    @Override public String nameForCombat() { return name; }
+    public int getXp() { return experienceReward; }
+    public int getInitiative() { return initiative; }
+    public int getCurrentHealth() { return currentHitPoints; }
+    public int getMaxHealth() { return maxHitPoints; }
+    public int getCurrentArmor() { return currentArmor; }
+    public int getInitialArmor() { return initialArmor; }
+    @Override public int currentHitPoints() { return currentHitPoints; }
+    @Override public int currentArmor() { return currentArmor; }
+    @Override public boolean isAlive() { return currentHitPoints > 0; }
+    @Override public boolean isStunned() { return stunned; }
+    @Override public void setStunned(boolean stunned) { this.stunned = stunned; }
+
+    public void takeDamage(int amount) {
+        if (amount < 0) throw new IllegalArgumentException("Les dÃ©gÃ¢ts ne peuvent pas Ãªtre nÃ©gatifs.");
+        currentHitPoints = Math.max(0, currentHitPoints - amount);
+    }
+
+    public void heal(int amount) {
+        if (amount < 0) throw new IllegalArgumentException("Le soin ne peut pas Ãªtre nÃ©gatif.");
+        currentHitPoints = Math.min(maxHitPoints, currentHitPoints + amount);
+    }
+
+    @Override
+    public void increaseArmor(int amount) {
+        if (amount < 0) throw new IllegalArgumentException("Le bonus d'armure ne peut pas Ãªtre nÃ©gatif.");
+        currentArmor = Math.addExact(currentArmor, amount);
+    }
+
+    @Override
+    public void decreaseArmor(int amount) {
+        if (amount < 0) throw new IllegalArgumentException("La rÃ©duction d'armure ne peut pas Ãªtre nÃ©gative.");
+        currentArmor = Math.max(0, currentArmor - amount);
+    }
+
+    public void resetArmor() { currentArmor = initialArmor; }
+
+    public int testAttack() {
+        return weaponDamage + dice.rollDiceSix() + baseAttack;
+    }
+
+    public Creature copy() {
+        return new Creature(name, maxHitPoints, initialArmor, experienceReward,
+                initiative, baseAttack, weaponName);
+    }
+}
+=== C:\Users\pierr\Documents\GitHub\Architecture_ProjetSession\src\main\java\rpg\creature\CreaturesModel.java ===
+package rpg.creature;
+
+import java.util.ArrayList;
+import java.util.List;
+
+public final class CreaturesModel {
+    public Creature getGobelin() { return new Creature("Gobelin", 7, 12, 50, 2, 3, "Dague"); }
+    public Creature getOrc() { return new Creature("Orc", 15, 13, 100, 1, 4, "Hache"); }
+    public Creature getTroll() { return new Creature("Troll", 35, 15, 300, 0, 6, "Massue"); }
+
+    public ArrayList<Creature> getGobelinPack() {
+        return new ArrayList<>(List.of(getGobelin(), getGobelin(), getGobelin()));
+    }
+
+    public ArrayList<Creature> getOrcCamp() {
+        return new ArrayList<>(List.of(getOrc(), getOrc(), getGobelin()));
+    }
+
+    public ArrayList<Creature> getTrollLair() {
+        return new ArrayList<>(List.of(getTroll()));
+    }
+}
+=== C:\Users\pierr\Documents\GitHub\Architecture_ProjetSession\src\main\java\rpg\creature\CreatureWeapons.java ===
+package rpg.creature;
+
+import java.util.Map;
+
+public final class CreatureWeapons {
+    private static final Map<String, Integer> WEAPON_DAMAGE =
+            Map.of("Dague", 3, "Hache", 4, "Massue", 6);
+
+    public int getWeaponDamage(String weapon) {
+        Integer damage = WEAPON_DAMAGE.get(weapon);
+        if (damage == null) throw new IllegalArgumentException("Arme de crÃ©ature inconnue : " + weapon);
+        return damage;
+    }
+}
+=== C:\Users\pierr\Documents\GitHub\Architecture_ProjetSession\src\main\java\rpg\hero\application\CreateHeroCommand.java ===
+package rpg.hero.application;
+
+import rpg.hero.domain.HeroClass;
+import rpg.hero.domain.Species;
+
+public record CreateHeroCommand(
+        String name, Species species, HeroClass heroClass,
+        int strength, int dexterity, int constitution,
+        int intelligence, int wisdom, int charisma) {
+}
+=== C:\Users\pierr\Documents\GitHub\Architecture_ProjetSession\src\main\java\rpg\hero\application\CreateHeroUseCase.java ===
+package rpg.hero.application;
+
+import java.util.Objects;
+import rpg.hero.domain.Characteristics;
+import rpg.hero.domain.Hero;
+import rpg.hero.domain.HeroFactory;
+import rpg.hero.domain.HeroName;
+import rpg.hero.domain.HeroRepository;
+
+public final class CreateHeroUseCase {
+    private final HeroFactory heroFactory;
+    private final HeroRepository heroRepository;
+    private final HeroOutputMapper outputMapper;
+
+    public CreateHeroUseCase(HeroFactory heroFactory, HeroRepository heroRepository,
+                             HeroOutputMapper outputMapper) {
+        this.heroFactory = Objects.requireNonNull(heroFactory);
+        this.heroRepository = Objects.requireNonNull(heroRepository);
+        this.outputMapper = Objects.requireNonNull(outputMapper);
+    }
+
+    public HeroOutput execute(CreateHeroCommand command) {
+        Objects.requireNonNull(command, "La commande de crÃ©ation du hÃ©ros est requise.");
+        Characteristics characteristics = new Characteristics(
+                command.strength(), command.dexterity(), command.constitution(),
+                command.intelligence(), command.wisdom(), command.charisma());
+        Hero hero = heroFactory.create(
+                new HeroName(command.name()), command.species(), command.heroClass(), characteristics);
+        heroRepository.save(hero);
+        return outputMapper.toOutput(hero);
+    }
+}
+=== C:\Users\pierr\Documents\GitHub\Architecture_ProjetSession\src\main\java\rpg\hero\application\HeroOutput.java ===
+package rpg.hero.application;
+
+public record HeroOutput(
+        String id, String name, String species, String heroClass,
+        int level, int experience,
+        int currentHitPoints, int maxHitPoints,
+        int currentMagicPoints, int maxMagicPoints) {
+}
+=== C:\Users\pierr\Documents\GitHub\Architecture_ProjetSession\src\main\java\rpg\hero\application\HeroOutputMapper.java ===
+package rpg.hero.application;
+
+import rpg.hero.domain.Hero;
+
+public final class HeroOutputMapper {
+    public HeroOutput toOutput(Hero hero) {
+        return new HeroOutput(
+                hero.id().toString(), hero.name().value(), hero.species().name(),
+                hero.heroClass().name(), hero.level(), hero.experience(),
+                hero.currentHitPoints(), hero.maxHitPoints(),
+                hero.currentMagicPoints(), hero.maxMagicPoints());
+    }
+}
+=== C:\Users\pierr\Documents\GitHub\Architecture_ProjetSession\src\main\java\rpg\hero\domain\ArmorCategory.java ===
+package rpg.hero.domain;
+
+public enum ArmorCategory {
+    LIGHT,
+    HEAVY
+}
+=== C:\Users\pierr\Documents\GitHub\Architecture_ProjetSession\src\main\java\rpg\hero\domain\Characteristics.java ===
+package rpg.hero.domain;
+
+public final class Characteristics {
+    private final int strength;
+    private final int dexterity;
+    private final int constitution;
+    private final int intelligence;
+    private final int wisdom;
+    private final int charisma;
+
+    public Characteristics(int strength, int dexterity, int constitution,
+                           int intelligence, int wisdom, int charisma) {
+        this.strength = strength;
+        this.dexterity = dexterity;
+        this.constitution = constitution;
+        this.intelligence = intelligence;
+        this.wisdom = wisdom;
+        this.charisma = charisma;
+    }
+
+    public int strength() { return strength; }
+    public int dexterity() { return dexterity; }
+    public int constitution() { return constitution; }
+    public int intelligence() { return intelligence; }
+    public int wisdom() { return wisdom; }
+    public int charisma() { return charisma; }
+
+    public int modifierOf(int value) {
+        return Math.floorDiv(value - 10, 2);
+    }
+
+    public int strengthModifier() { return modifierOf(strength); }
+    public int dexterityModifier() { return modifierOf(dexterity); }
+    public int constitutionModifier() { return modifierOf(constitution); }
+}
+=== C:\Users\pierr\Documents\GitHub\Architecture_ProjetSession\src\main\java\rpg\hero\domain\Hero.java ===
+package rpg.hero.domain;
+
+import java.util.Objects;
+import rpg.combat.Combatant;
+import rpg.item.Armor;
+import rpg.item.Equipment;
+import rpg.item.Inventory;
+import rpg.item.Weapon;
+import rpg.progression.LevelTable;
+import rpg.progression.XpReceiver;
+
+public final class Hero implements Combatant, XpReceiver {
+    private final HeroId id;
+    private final HeroName name;
+    private final Species species;
+    private final HeroClass heroClass;
+    private final Characteristics characteristics;
+    private final Inventory inventory = new Inventory();
+    private final Equipment equipment = new Equipment();
+    private int level = 1;
+    private int experience;
+    private int maxHitPoints;
+    private int currentHitPoints;
+    private final int maxMagicPoints;
+    private int currentMagicPoints;
+    private int armorBonus;
+    private boolean stunned;
+
+    Hero(HeroId id, HeroName name, Species species, HeroClass heroClass,
+         Characteristics characteristics) {
+        this.id = Objects.requireNonNull(id);
+        this.name = Objects.requireNonNull(name);
+        this.species = Objects.requireNonNull(species);
+        this.heroClass = Objects.requireNonNull(heroClass);
+        this.characteristics = Objects.requireNonNull(characteristics);
+        this.maxHitPoints = heroClass.calculateMaxHitPoints(
+                effectiveConstitutionModifier());
+        this.currentHitPoints = maxHitPoints;
+        this.maxMagicPoints = heroClass.baseMagic();
+        this.currentMagicPoints = maxMagicPoints;
+    }
+
+    public HeroId id() { return id; }
+    public HeroName name() { return name; }
+    public Species species() { return species; }
+    public HeroClass heroClass() { return heroClass; }
+    public Characteristics characteristics() { return characteristics; }
+    public Inventory inventory() { return inventory; }
+    public Equipment equipment() { return equipment; }
+    public int level() { return level; }
+    @Override public int getTotalXp() { return experience; }
+    public int experience() { return experience; }
+    @Override public int currentHitPoints() { return currentHitPoints; }
+    public int maxHitPoints() { return maxHitPoints; }
+    public int currentMagicPoints() { return currentMagicPoints; }
+    public int maxMagicPoints() { return maxMagicPoints; }
+
+    @Override public String nameForCombat() { return name.value(); }
+    @Override
+    public int currentArmor() {
+        Armor armor = equipment.getMainArmor();
+        int baseArmorClass = armor == null ? 10 : armor.getBaseArmorClass();
+        int dexterityBonus = armor == null || armor.usesDexterityModifier()
+                ? effectiveDexterityModifier() : 0;
+        return baseArmorClass + dexterityBonus + armorBonus;
+    }
+    @Override public boolean isStunned() { return stunned; }
+    @Override public void setStunned(boolean stunned) { this.stunned = stunned; }
+
+    public int strengthModifier() {
+        return characteristics.modifierOf(characteristics.strength() + species.strengthBonus());
+    }
+
+    public int dexterityModifier() {
+        return characteristics.modifierOf(characteristics.dexterity() + species.dexterityBonus());
+    }
+
+    public int abilityModifier(String ability) {
+        return switch (ability.toUpperCase()) {
+            case "FOR", "STR" -> strengthModifier();
+            case "DEX" -> dexterityModifier();
+            case "CON" -> effectiveConstitutionModifier();
+            case "INT" -> characteristics.modifierOf(
+                    characteristics.intelligence() + species.intelligenceBonus());
+            case "SAG", "WIS" -> characteristics.modifierOf(
+                    characteristics.wisdom() + species.wisdomBonus());
+            case "CHA" -> characteristics.modifierOf(
+                    characteristics.charisma() + species.charismaBonus());
+            default -> throw new IllegalArgumentException("CaractÃ©ristique d'attaque inconnue : " + ability);
+        };
+    }
+
+    public int attackModifier() {
+        Weapon weapon = equipment.getMainWeapon();
+        return abilityModifier(weapon == null ? "FOR" : weapon.getAbility());
+    }
+
+    private int effectiveDexterityModifier() {
+        return dexterityModifier();
+    }
+
+    private int effectiveConstitutionModifier() {
+        return characteristics.modifierOf(
+                characteristics.constitution() + species.constitutionBonus());
+    }
+
+    @Override
+    public boolean isAlive() { return currentHitPoints > 0; }
+
+    public boolean isDefeated() { return !isAlive(); }
+
+    @Override
+    public void takeDamage(int amount) {
+        if (amount < 0) throw new IllegalArgumentException("Les dÃ©gÃ¢ts ne peuvent pas Ãªtre nÃ©gatifs.");
+        currentHitPoints = Math.max(0, currentHitPoints - amount);
+    }
+
+    public void heal(int amount) {
+        if (amount < 0) throw new IllegalArgumentException("Le soin ne peut pas Ãªtre nÃ©gatif.");
+        currentHitPoints = Math.min(maxHitPoints, currentHitPoints + amount);
+    }
+
+    public void increaseArmor(int amount) {
+        if (amount < 0) throw new IllegalArgumentException("Le bonus d'armure ne peut pas Ãªtre nÃ©gatif.");
+        armorBonus += amount;
+    }
+
+    public void decreaseArmor(int amount) {
+        if (amount < 0) throw new IllegalArgumentException("La rÃ©duction d'armure ne peut pas Ãªtre nÃ©gative.");
+        armorBonus = Math.max(0, armorBonus - amount);
+    }
+
+    @Override
+    public void gainXp(int amount) {
+        if (amount < 0) throw new IllegalArgumentException("L'expÃ©rience ne peut pas Ãªtre nÃ©gative.");
+        experience = Math.addExact(experience, amount);
+    }
+
+    public int applyLevelUp(int newLevel) {
+        if (newLevel < level || newLevel > LevelTable.MAX_LEVEL) {
+            throw new IllegalArgumentException("Le nouveau niveau doit Ãªtre supÃ©rieur ou Ã©gal au niveau actuel.");
+        }
+        int gainedLevels = newLevel - level;
+        int hitPointsGained = gainedLevels
+                * Math.max(1, heroClass.basePv() / 2 + effectiveConstitutionModifier());
+        maxHitPoints += hitPointsGained;
+        currentHitPoints = Math.min(maxHitPoints, currentHitPoints + hitPointsGained);
+        level = newLevel;
+        return hitPointsGained;
+    }
+
+    @Override
+    public boolean equals(Object other) {
+        return other instanceof Hero hero && id.equals(hero.id);
+    }
+
+    @Override
+    public int hashCode() { return id.hashCode(); }
+}
+=== C:\Users\pierr\Documents\GitHub\Architecture_ProjetSession\src\main\java\rpg\hero\domain\HeroClass.java ===
+package rpg.hero.domain;
+
+public enum HeroClass {
+    WARRIOR(12, 0),
+    RANGER(10, 0),
+    MAGE(6, 10),
+    CLERIC(10, 8);
+
+    private final int basePv;
+    private final int baseMagic;
+
+    HeroClass(int basePv, int baseMagic) {
+        this.basePv = basePv;
+        this.baseMagic = baseMagic;
+    }
+
+    public int basePv() { return basePv; }
+    public int baseMagic() { return baseMagic; }
+
+    public int calculateMaxHitPoints(int constitutionModifier) {
+        return Math.max(1, basePv + constitutionModifier);
+    }
+
+    public boolean canUse(WeaponCategory weapon) {
+        return switch (this) {
+            case WARRIOR -> weapon.isMelee();
+            case RANGER -> weapon == WeaponCategory.BOW
+                    || weapon == WeaponCategory.DAGGER || weapon == WeaponCategory.SWORD;
+            case MAGE -> weapon == WeaponCategory.STAFF || weapon == WeaponCategory.DAGGER;
+            case CLERIC -> weapon == WeaponCategory.MACE || weapon == WeaponCategory.STAFF;
+        };
+    }
+
+    public boolean canUse(ArmorCategory armor) {
+        return switch (this) {
+            case WARRIOR, CLERIC -> true;
+            case RANGER -> armor == ArmorCategory.LIGHT;
+            case MAGE -> false;
+        };
+    }
+}
+=== C:\Users\pierr\Documents\GitHub\Architecture_ProjetSession\src\main\java\rpg\hero\domain\HeroFactory.java ===
+package rpg.hero.domain;
+
+import java.util.Objects;
+import java.util.UUID;
+
+public final class HeroFactory {
+    private final HeroRepository heroRepository;
+
+    public HeroFactory(HeroRepository heroRepository) {
+        this.heroRepository = Objects.requireNonNull(heroRepository);
+    }
+
+    public Hero create(HeroName name, Species species, HeroClass heroClass,
+                       Characteristics characteristics) {
+        if (heroRepository.existsByName(name)) {
+            throw new IllegalArgumentException("Le nom de hÃ©ros \"" + name + "\" est dÃ©jÃ  utilisÃ©.");
+        }
+        return new Hero(new HeroId(UUID.randomUUID()), name, species, heroClass, characteristics);
+    }
+}
+=== C:\Users\pierr\Documents\GitHub\Architecture_ProjetSession\src\main\java\rpg\hero\domain\HeroId.java ===
+package rpg.hero.domain;
+
+import java.util.Objects;
+import java.util.UUID;
+
+public record HeroId(UUID value) {
+    public HeroId {
+        Objects.requireNonNull(value, "L'identifiant du hÃ©ros est requis.");
+    }
+
+    @Override
+    public String toString() { return value.toString(); }
+}
+=== C:\Users\pierr\Documents\GitHub\Architecture_ProjetSession\src\main\java\rpg\hero\domain\HeroName.java ===
+package rpg.hero.domain;
+
+import java.util.regex.Pattern;
+
+public final class HeroName {
+    private static final Pattern VALID_CHARACTERS =
+            Pattern.compile("^[A-Za-zÃ€-Ã–Ã˜-Ã¶Ã¸-Ã¿ ]+$");
+
+    private final String value;
+
+    public HeroName(String value) {
+        if (value == null || value.length() < 2 || value.length() > 30
+                || value.startsWith(" ") || value.endsWith(" ")
+                || !VALID_CHARACTERS.matcher(value).matches()) {
+            throw new IllegalArgumentException(
+                    "Le nom doit contenir entre 2 et 30 lettres, sans espace au dÃ©but ni Ã  la fin.");
+        }
+        this.value = value;
+    }
+
+    public String value() { return value; }
+
+    @Override
+    public boolean equals(Object other) {
+        return other instanceof HeroName heroName && value.equals(heroName.value);
+    }
+
+    @Override
+    public int hashCode() { return value.hashCode(); }
+
+    @Override
+    public String toString() { return value; }
+}
+=== C:\Users\pierr\Documents\GitHub\Architecture_ProjetSession\src\main\java\rpg\hero\domain\HeroRepository.java ===
+package rpg.hero.domain;
+
+import java.util.Optional;
+
+public interface HeroRepository {
+    void save(Hero hero);
+    Optional<Hero> findById(HeroId id);
+    boolean existsByName(HeroName name);
+}
+=== C:\Users\pierr\Documents\GitHub\Architecture_ProjetSession\src\main\java\rpg\hero\domain\Species.java ===
+package rpg.hero.domain;
+
+public enum Species {
+    HUMAN(1, 1, 1, 1, 1, 1),
+    ELF(0, 2, 0, 1, 0, 0),
+    DWARF(1, 0, 2, 0, 0, 0),
+    ORC(2, 0, 1, -1, 0, 0);
+
+    private final int strengthBonus;
+    private final int dexterityBonus;
+    private final int constitutionBonus;
+    private final int intelligenceBonus;
+    private final int wisdomBonus;
+    private final int charismaBonus;
+
+    Species(int strengthBonus, int dexterityBonus, int constitutionBonus,
+            int intelligenceBonus, int wisdomBonus, int charismaBonus) {
+        this.strengthBonus = strengthBonus;
+        this.dexterityBonus = dexterityBonus;
+        this.constitutionBonus = constitutionBonus;
+        this.intelligenceBonus = intelligenceBonus;
+        this.wisdomBonus = wisdomBonus;
+        this.charismaBonus = charismaBonus;
+    }
+
+    public int strengthBonus() { return strengthBonus; }
+    public int dexterityBonus() { return dexterityBonus; }
+    public int constitutionBonus() { return constitutionBonus; }
+    public int intelligenceBonus() { return intelligenceBonus; }
+    public int wisdomBonus() { return wisdomBonus; }
+    public int charismaBonus() { return charismaBonus; }
+}
+=== C:\Users\pierr\Documents\GitHub\Architecture_ProjetSession\src\main\java\rpg\hero\domain\WeaponCategory.java ===
+package rpg.hero.domain;
+
+public enum WeaponCategory {
+    SWORD(true), AXE(true), MACE(true), DAGGER(true), BOW(false), STAFF(true);
+
+    private final boolean melee;
+
+    WeaponCategory(boolean melee) {
+        this.melee = melee;
+    }
+
+    public boolean isMelee() {
+        return melee;
+    }
+}
+=== C:\Users\pierr\Documents\GitHub\Architecture_ProjetSession\src\main\java\rpg\hero\infrastructure\InMemoryHeroRepository.java ===
+package rpg.hero.infrastructure;
+
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Optional;
+import rpg.hero.domain.Hero;
+import rpg.hero.domain.HeroId;
+import rpg.hero.domain.HeroName;
+import rpg.hero.domain.HeroRepository;
+
+public final class InMemoryHeroRepository implements HeroRepository {
+    private final Map<HeroId, Hero> heroes = new HashMap<>();
+
+    @Override
+    public void save(Hero hero) { heroes.put(hero.id(), hero); }
+
+    @Override
+    public Optional<Hero> findById(HeroId id) {
+        return Optional.ofNullable(heroes.get(id));
+    }
+
+    @Override
+    public boolean existsByName(HeroName name) {
+        return heroes.values().stream().anyMatch(hero -> hero.name().equals(name));
+    }
+}
+=== C:\Users\pierr\Documents\GitHub\Architecture_ProjetSession\src\main\java\rpg\item\Armor.java ===
+package rpg.item;
+
+import java.util.Objects;
+import rpg.hero.domain.ArmorCategory;
+
+public final class Armor implements Item {
+    private final String name;
+    private final int baseArmorClass;
+    private final boolean usesDexterityModifier;
+    private final ArmorCategory category;
+
+    public Armor(String name, int baseArmorClass, boolean usesDexterityModifier,
+                 ArmorCategory category) {
+        if (name == null || name.isBlank()) throw new IllegalArgumentException("Le nom de l'armure est obligatoire.");
+        if (baseArmorClass <= 0) throw new IllegalArgumentException("La classe d'armure doit Ãªtre supÃ©rieure Ã  0.");
+        this.name = name;
+        this.baseArmorClass = baseArmorClass;
+        this.usesDexterityModifier = usesDexterityModifier;
+        this.category = Objects.requireNonNull(category);
+    }
+
+    public Armor(String name, int baseArmorClass, boolean usesDexterityModifier) {
+        this(name, baseArmorClass, usesDexterityModifier,
+                usesDexterityModifier ? ArmorCategory.LIGHT : ArmorCategory.HEAVY);
+    }
+
+    @Override public String getName() { return name; }
+    public int getBaseArmorClass() { return baseArmorClass; }
+    public boolean usesDexterityModifier() { return usesDexterityModifier; }
+    public ArmorCategory getCategory() { return category; }
+}
+=== C:\Users\pierr\Documents\GitHub\Architecture_ProjetSession\src\main\java\rpg\item\Equipment.java ===
+package rpg.item;
+
+import java.util.Objects;
+import rpg.hero.domain.HeroClass;
+
+public final class Equipment {
+    private Weapon mainWeapon;
+    private Armor mainArmor;
+
+    public void equip(Weapon weapon, Inventory inventory, HeroClass heroClass) {
+        Objects.requireNonNull(inventory);
+        Objects.requireNonNull(heroClass);
+        if (weapon == null || !inventory.contains(weapon)) {
+            throw new IllegalStateException("Le hÃ©ros ne possÃ¨de pas cette arme.");
+        }
+        if (!heroClass.canUse(weapon.getCategory())) {
+            throw new IllegalStateException("La classe ne permet pas d'utiliser cette arme.");
+        }
+        mainWeapon = weapon;
+    }
+
+    public void equip(Armor armor, Inventory inventory, HeroClass heroClass) {
+        Objects.requireNonNull(inventory);
+        Objects.requireNonNull(heroClass);
+        if (armor == null || !inventory.contains(armor)) {
+            throw new IllegalStateException("Le hÃ©ros ne possÃ¨de pas cette armure.");
+        }
+        if (!heroClass.canUse(armor.getCategory())) {
+            throw new IllegalStateException("La classe ne permet pas d'utiliser cette armure.");
+        }
+        mainArmor = armor;
+    }
+
+    public Weapon getMainWeapon() { return mainWeapon; }
+    public Armor getMainArmor() { return mainArmor; }
+}
+=== C:\Users\pierr\Documents\GitHub\Architecture_ProjetSession\src\main\java\rpg\item\Inventory.java ===
+package rpg.item;
+
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+
+public final class Inventory {
+    private static final int MAX_CAPACITY = 10;
+    private final List<Item> items = new ArrayList<>();
+
+    public void add(Item item) {
+        if (item == null) throw new IllegalArgumentException("L'objet ne peut pas Ãªtre null.");
+        if (isFull()) throw new IllegalStateException("L'inventaire est plein.");
+        items.add(item);
+    }
+
+    public void remove(Item item) {
+        if (item == null) throw new IllegalArgumentException("L'objet ne peut pas Ãªtre null.");
+        if (!items.remove(item)) throw new IllegalStateException("L'objet n'est pas dans l'inventaire.");
+    }
+
+    public boolean contains(Item item) { return items.contains(item); }
+    public int size() { return items.size(); }
+    public boolean isFull() { return size() >= MAX_CAPACITY; }
+    public List<Item> getItems() { return Collections.unmodifiableList(items); }
+}
+=== C:\Users\pierr\Documents\GitHub\Architecture_ProjetSession\src\main\java\rpg\item\Item.java ===
+package rpg.item;
+
+public interface Item {
+    String getName();
+}
+=== C:\Users\pierr\Documents\GitHub\Architecture_ProjetSession\src\main\java\rpg\item\Potion.java ===
+package rpg.item;
+
+public final class Potion implements Item {
+    private final String name;
+    private final String healingDice;
+    private final int healingBonus;
+
+    public Potion(String name, String healingDice, int healingBonus) {
+        if (name == null || name.isBlank()) throw new IllegalArgumentException("Le nom de la potion est obligatoire.");
+        if (healingDice == null || healingDice.isBlank()) throw new IllegalArgumentException("Le dÃ© de soin est obligatoire.");
+        if (healingBonus < 0) throw new IllegalArgumentException("Le bonus de soin ne peut pas Ãªtre nÃ©gatif.");
+        this.name = name;
+        this.healingDice = healingDice;
+        this.healingBonus = healingBonus;
+    }
+
+    @Override public String getName() { return name; }
+    public String getHealingDice() { return healingDice; }
+    public int getHealingBonus() { return healingBonus; }
+}
+=== C:\Users\pierr\Documents\GitHub\Architecture_ProjetSession\src\main\java\rpg\item\Weapon.java ===
+package rpg.item;
+
+import java.util.Objects;
+import rpg.hero.domain.WeaponCategory;
+
+public final class Weapon implements Item {
+    private final String name;
+    private final int damageDice;
+    private final String ability;
+    private final WeaponCategory category;
+
+    public Weapon(String name, int damageDice, String ability, WeaponCategory category) {
+        if (name == null || name.isBlank()) throw new IllegalArgumentException("Le nom de l'arme est obligatoire.");
+        if ((Integer)damageDice == null || damageDice <=1) throw new IllegalArgumentException("Le dÃ© de dÃ©gÃ¢ts est obligatoire.");
+        if (ability == null || ability.isBlank()) throw new IllegalArgumentException("La caractÃ©ristique est obligatoire.");
+        this.name = name;
+        this.damageDice = damageDice;
+        this.ability = ability;
+        this.category = Objects.requireNonNull(category);
+    }
+
+    public Weapon(String name, int damageDice, String ability) {
+        this(name, damageDice, ability, categoryFromName(name));
+    }
+
+    private static WeaponCategory categoryFromName(String name) {
+        if (name == null) throw new IllegalArgumentException("Le nom de l'arme est obligatoire.");
+        String normalized = name.toLowerCase();
+        if (normalized.contains("arc")) return WeaponCategory.BOW;
+        if (normalized.contains("dague")) return WeaponCategory.DAGGER;
+        if (normalized.contains("hache")) return WeaponCategory.AXE;
+        if (normalized.contains("masse") || normalized.contains("marteau")) return WeaponCategory.MACE;
+        if (normalized.contains("bÃ¢ton") || normalized.contains("baton")) return WeaponCategory.STAFF;
+        if (normalized.contains("Ã©pÃ©e") || normalized.contains("epee")
+                || normalized.contains("sword")) return WeaponCategory.SWORD;
+        throw new IllegalArgumentException(
+                "La catÃ©gorie de l'arme doit Ãªtre prÃ©cisÃ©e pour le nom : " + name);
+    }
+
+    @Override public String getName() { return name; }
+    public int getDamageDice() { return damageDice; }
+    public String getAbility() { return ability; }
+    public WeaponCategory getCategory() { return category; }
+}
+=== C:\Users\pierr\Documents\GitHub\Architecture_ProjetSession\src\main\java\rpg\progression\ExperienceDistributor.java ===
+package rpg.progression;
+
+import java.util.List;
+import java.util.Objects;
+
+public final class ExperienceDistributor {
+    public int distribute(int totalXp, List<? extends XpReceiver> participants) {
+        if (totalXp < 0) throw new IllegalArgumentException("L'expÃ©rience totale ne peut pas Ãªtre nÃ©gative.");
+        if (participants == null || participants.isEmpty()) {
+            throw new IllegalArgumentException("Au moins un participant est requis.");
+        }
+        if (participants.stream().anyMatch(Objects::isNull)) {
+            throw new IllegalArgumentException("Un participant ne peut pas Ãªtre null.");
+        }
+        int share = totalXp / participants.size();
+        for (XpReceiver participant : participants) participant.gainXp(share);
+        return share;
+    }
+}
+=== C:\Users\pierr\Documents\GitHub\Architecture_ProjetSession\src\main\java\rpg\progression\LevelTable.java ===
+package rpg.progression;
+
+public final class LevelTable {
+    public static final int MAX_LEVEL = 5;
+    private static final int[] XP_REQUIRED = {0, 300, 900, 2700, 6500};
+
+    public int levelForXp(int totalXp) {
+        if (totalXp < 0) throw new IllegalArgumentException("L'expÃ©rience ne peut pas Ãªtre nÃ©gative.");
+        int level = 1;
+        for (int index = 0; index < XP_REQUIRED.length; index++) {
+            if (totalXp >= XP_REQUIRED[index]) level = index + 1;
+        }
+        return level;
+    }
+
+    public int xpRequiredForLevel(int level) {
+        if (level < 1 || level > MAX_LEVEL) {
+            throw new IllegalArgumentException("Le niveau doit Ãªtre entre 1 et " + MAX_LEVEL + ".");
+        }
+        return XP_REQUIRED[level - 1];
+    }
+}
+=== C:\Users\pierr\Documents\GitHub\Architecture_ProjetSession\src\main\java\rpg\progression\LevelUpResult.java ===
+package rpg.progression;
+
+public record LevelUpResult(int oldLevel, int newLevel, int hpGained) {
+    public boolean leveledUp() { return newLevel > oldLevel; }
+}
+=== C:\Users\pierr\Documents\GitHub\Architecture_ProjetSession\src\main\java\rpg\progression\LevelUpService.java ===
+package rpg.progression;
+
+import java.util.Objects;
+import rpg.hero.domain.Hero;
+
+public final class LevelUpService {
+    private final LevelTable levelTable;
+
+    public LevelUpService(LevelTable levelTable) {
+        this.levelTable = Objects.requireNonNull(levelTable);
+    }
+
+    public LevelUpResult checkLevelUp(Hero hero) {
+        Objects.requireNonNull(hero, "Le hÃ©ros est requis.");
+        int oldLevel = hero.level();
+        int newLevel = levelTable.levelForXp(hero.getTotalXp());
+        int hpGained = oldLevel < newLevel ? hero.applyLevelUp(newLevel) : 0;
+        return new LevelUpResult(oldLevel, Math.max(oldLevel, newLevel), hpGained);
+    }
+}
+=== C:\Users\pierr\Documents\GitHub\Architecture_ProjetSession\src\main\java\rpg\progression\XpReceiver.java ===
+package rpg.progression;
+
+public interface XpReceiver {
+    int getTotalXp();
+    void gainXp(int amount);
+}
+=== C:\Users\pierr\Documents\GitHub\Architecture_ProjetSession\src\main\java\rpg\Main.java ===
+package rpg;
+
+import java.util.List;
+import java.util.Scanner;
+import java.util.UUID;
+import rpg.combat.Combat;
+import rpg.creature.CreaturesModel;
+import rpg.hero.application.CreateHeroCommand;
+import rpg.hero.application.CreateHeroUseCase;
+import rpg.hero.application.HeroOutput;
+import rpg.hero.application.HeroOutputMapper;
+import rpg.hero.domain.ArmorCategory;
+import rpg.hero.domain.Hero;
+import rpg.hero.domain.HeroClass;
+import rpg.hero.domain.HeroFactory;
+import rpg.hero.domain.HeroId;
+import rpg.hero.domain.HeroRepository;
+import rpg.hero.domain.Species;
+import rpg.hero.domain.WeaponCategory;
+import rpg.hero.infrastructure.InMemoryHeroRepository;
+import rpg.item.Armor;
+import rpg.item.Potion;
+import rpg.item.Weapon;
+
+public final class Main {
+    private Main() {}
+
+    public static void main(String[] args) {
+        HeroRepository repository = new InMemoryHeroRepository();
+        CreateHeroUseCase createHero = new CreateHeroUseCase(
+                new HeroFactory(repository), repository, new HeroOutputMapper());
+        List<Hero> heroes = List.of(
+                createHero(createHero, repository, "Thorin", Species.DWARF),
+                createHero(createHero, repository, "Aria", Species.ELF),
+                createHero(createHero, repository, "Borin", Species.HUMAN));
+
+        System.out.println("=== DÃ©monstration RPG ===");
+        for (Hero hero : heroes) {
+            System.out.printf("%s â€” %s %s â€” Niveau %d â€” PV %d/%d â€” CA %d%n",
+                    hero.name(), hero.species(), hero.heroClass(), hero.level(),
+                    hero.currentHitPoints(), hero.maxHitPoints(), hero.currentArmor());
+            System.out.printf("Ã‰quipement : %s, %s â€” Inventaire : %d/10 objets%n",
+                    hero.equipment().getMainWeapon().getName(),
+                    hero.equipment().getMainArmor().getName(), hero.inventory().size());
+        }
+        System.out.println("Saisissez le numÃ©ro d'une cible Ã  votre tour.");
+        new Combat(new Scanner(System.in)).start(
+                heroes, new CreaturesModel().getGobelinPack());
+    }
+
+    private static Hero createHero(CreateHeroUseCase createHero, HeroRepository repository,
+                                   String name, Species species) {
+        HeroOutput output = createHero.execute(new CreateHeroCommand(
+                name, species, HeroClass.WARRIOR,
+                14, 12, 16, 8, 10, 13));
+        Hero hero = repository.findById(new HeroId(UUID.fromString(output.id())))
+                .orElseThrow(() -> new IllegalStateException("Le hÃ©ros crÃ©Ã© est introuvable."));
+        Weapon weapon = new Weapon("Ã‰pÃ©e longue", 8, "FOR", WeaponCategory.SWORD);
+        Armor armor = new Armor("Armure lÃ©gÃ¨re", 12, true, ArmorCategory.LIGHT);
+        hero.inventory().add(weapon);
+        hero.inventory().add(armor);
+        hero.inventory().add(new Potion("Potion de soin", "2d4", 2));
+        hero.equipment().equip(weapon, hero.inventory(), hero.heroClass());
+        hero.equipment().equip(armor, hero.inventory(), hero.heroClass());
+        return hero;
+    }
+}
+=== C:\Users\pierr\Documents\GitHub\Architecture_ProjetSession\src\test\java\rpg\hero\domain\HeroDomainTest.java ===
+package rpg.hero.domain;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import org.junit.jupiter.api.Test;
+import rpg.hero.infrastructure.InMemoryHeroRepository;
+import rpg.item.Armor;
+import rpg.item.Weapon;
+
+class HeroDomainTest {
+    private final InMemoryHeroRepository repository = new InMemoryHeroRepository();
+    private final HeroFactory factory = new HeroFactory(repository);
+
+    @Test
+    void createsHeroWithSpeciesBonusesAndClassHitPoints() {
+        Hero hero = factory.create(
+                new HeroName("Thorin"), Species.DWARF, HeroClass.WARRIOR,
+                new Characteristics(14, 12, 16, 8, 10, 13));
+
+        assertEquals(16, hero.maxHitPoints());
+        assertEquals(2, hero.strengthModifier());
+        assertEquals(11, hero.currentArmor());
+    }
+
+    @Test
+    void rejectsDuplicateHeroNames() {
+        HeroName name = new HeroName("Thorin");
+        factory.create(name, Species.DWARF, HeroClass.WARRIOR,
+                new Characteristics(14, 12, 16, 8, 10, 13));
+
+        assertThrows(IllegalArgumentException.class, () -> factory.create(
+                name, Species.HUMAN, HeroClass.MAGE,
+                new Characteristics(10, 10, 10, 10, 10, 10)));
+    }
+
+    @Test
+    void appliesClassEquipmentRestrictions() {
+        Hero mage = factory.create(
+                new HeroName("Aria"), Species.ELF, HeroClass.MAGE,
+                new Characteristics(10, 12, 12, 16, 12, 10));
+        Armor heavyArmor = new Armor("Armure lourde", 16, false);
+        mage.inventory().add(heavyArmor);
+
+        assertThrows(IllegalStateException.class,
+                () -> mage.equipment().equip(heavyArmor, mage.inventory(), mage.heroClass()));
+        assertThrows(IllegalArgumentException.class,
+                () -> new HeroName("Mage123"));
+    }
+}
+=== C:\Users\pierr\Documents\GitHub\Architecture_ProjetSession\src\test\java\rpg\item\InventoryTest.java ===
+package rpg.item;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import org.junit.jupiter.api.Test;
+
+class InventoryTest {
+    @Test
+    void enforcesCapacityAndSupportsAddingAndRemovingItems() {
+        Inventory inventory = new Inventory();
+        Weapon sword = new Weapon("Ã‰pÃ©e longue", 8, "FOR");
+        inventory.add(sword);
+        assertTrue(inventory.contains(sword));
+        inventory.remove(sword);
+        assertFalse(inventory.contains(sword));
+
+        for (int index = 0; index < 10; index++) {
+            inventory.add(new Potion("Potion de soin", "2d4", 2));
+        }
+        assertTrue(inventory.isFull());
+        assertEquals(10, inventory.size());
+        assertThrows(IllegalStateException.class,
+                () -> inventory.add(new Weapon("Dague", 4, "DEX")));
+    }
+}
+=== C:\Users\pierr\Documents\GitHub\Architecture_ProjetSession\src\test\java\rpg\progression\ExperienceDistributorTest.java ===
+package rpg.progression;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import java.util.List;
+import org.junit.jupiter.api.Test;
+
+class ExperienceDistributorTest {
+    private static final class Receiver implements XpReceiver {
+        private int xp;
+        @Override public int getTotalXp() { return xp; }
+        @Override public void gainXp(int amount) { xp += amount; }
+    }
+
+    private final ExperienceDistributor distributor = new ExperienceDistributor();
+
+    @Test
+    void splitsExperienceEquallyAndDropsTheRemainder() {
+        Receiver first = new Receiver();
+        Receiver second = new Receiver();
+        Receiver third = new Receiver();
+
+        assertEquals(33, distributor.distribute(100, List.of(first, second, third)));
+        assertEquals(33, first.getTotalXp());
+        assertEquals(33, second.getTotalXp());
+        assertEquals(33, third.getTotalXp());
+    }
+
+    @Test
+    void rejectsNegativeExperienceAndAnEmptyParty() {
+        assertThrows(IllegalArgumentException.class,
+                () -> distributor.distribute(-1, List.of(new Receiver())));
+        assertThrows(IllegalArgumentException.class,
+                () -> distributor.distribute(10, List.of()));
+    }
+}
+=== C:\Users\pierr\Documents\GitHub\Architecture_ProjetSession\src\test\java\rpg\progression\LevelTableTest.java ===
+package rpg.progression;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import org.junit.jupiter.api.Test;
+
+class LevelTableTest {
+    private final LevelTable table = new LevelTable();
+
+    @Test
+    void usesTheExperienceThresholdsAndLevelCap() {
+        assertEquals(1, table.levelForXp(299));
+        assertEquals(2, table.levelForXp(300));
+        assertEquals(3, table.levelForXp(950));
+        assertEquals(5, table.levelForXp(999999));
+        assertEquals(2700, table.xpRequiredForLevel(4));
+    }
+
+    @Test
+    void rejectsInvalidExperienceAndLevels() {
+        assertThrows(IllegalArgumentException.class, () -> table.levelForXp(-1));
+        assertThrows(IllegalArgumentException.class, () -> table.xpRequiredForLevel(0));
+        assertThrows(IllegalArgumentException.class, () -> table.xpRequiredForLevel(6));
+    }
+}
+=== C:\Users\pierr\Documents\GitHub\Architecture_ProjetSession\src\test\java\rpg\progression\LevelUpServiceTest.java ===
+package rpg.progression;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import org.junit.jupiter.api.Test;
+import rpg.hero.domain.Characteristics;
+import rpg.hero.domain.Hero;
+import rpg.hero.domain.HeroClass;
+import rpg.hero.domain.HeroFactory;
+import rpg.hero.domain.HeroName;
+import rpg.hero.domain.Species;
+import rpg.hero.infrastructure.InMemoryHeroRepository;
+
+class LevelUpServiceTest {
+    @Test
+    void awardsHitPointsWhenExperienceCrossesLevelThresholds() {
+        var repository = new InMemoryHeroRepository();
+        Hero hero = new HeroFactory(repository).create(
+                new HeroName("Thorin"), Species.DWARF, HeroClass.WARRIOR,
+                new Characteristics(14, 12, 16, 8, 10, 13));
+        hero.takeDamage(5);
+        hero.gainXp(900);
+
+        LevelUpResult result = new LevelUpService(new LevelTable()).checkLevelUp(hero);
+
+        assertTrue(result.leveledUp());
+        assertEquals(3, result.newLevel());
+        assertEquals(20, result.hpGained());
+        assertEquals(36, hero.maxHitPoints());
+        assertEquals(31, hero.currentHitPoints());
+    }
+}
+=== C:\Users\pierr\Documents\GitHub\Architecture_ProjetSession\HeroDemo.java ===
+package hero.domain;
+
+import hero.infrastructure.InMemoryHeroRepository;
+import hero.domain.exception.DomainException;
+
+public class HeroDemo {
+
+    public static void main(String[] args) {
+        Characteristics stats = new Characteristics(14, 12, 16, 8, 10, 13);
+
+        HeroRepository repository = new InMemoryHeroRepository();
+        HeroFactory factory = new HeroFactory(repository);
+        Hero thorin = factory.create(new HeroName("Thorin"), Species.DWARF, HeroClass.WARRIOR, stats);
+
+        System.out.println("Nom        : " + thorin.name());
+        System.out.println("EspÃ¨ce     : " + thorin.species());
+        System.out.println("Classe     : " + thorin.heroClass());
+        System.out.println("Niveau     : " + thorin.level());
+        System.out.println("XP         : " + thorin.experience());
+        System.out.println("PV         : " + thorin.currentHitPoints() + " / " + thorin.maxHitPoints());
+        System.out.println("Magie      : " + thorin.currentMagicPoints() + " / " + thorin.maxMagicPoints());
+        System.out.println("Vaincu ?   : " + thorin.isDefeated());
+
+        
+        System.out.println("\n--- Test de validation de nom ---");
+        tryInvalidName("A");            
+        tryInvalidName(" Aria");        
+        tryInvalidName("Mage123");      
+        tryInvalidName(null);          
+    }
+
+    private static void tryInvalidName(String name) {
+        try {
+            new HeroName(name);
+            System.out.println("[ERREUR] Le nom aurait dÃ» Ãªtre rejetÃ© : " + name);
+        } catch (DomainException e) {
+            System.out.println("RejetÃ© correctement (\"" + name + "\") : " + e.getMessage());
+        }
+    }
+}
+=== C:\Users\pierr\Documents\GitHub\Architecture_ProjetSession\Main.java ===
+package hero;
+
+import config.ApplicationContext;
+import hero.infrastructure.HeroHttpServer;
+import java.io.IOException;
+
+public final class Main {
+
+    private static final int DEFAULT_PORT = 8080;
+
+    private Main() {}
+
+    public static void main(String[] args) throws IOException {
+        int port = port(args);
+        ApplicationContext context = new ApplicationContext();
+        HeroHttpServer server = context.createHeroHttpServer(port);
+        server.start();
+        System.out.println("API HÃ©ros disponible sur http://localhost:" + port);
+    }
+
+    private static int port(String[] args) {
+        if (args.length > 0) {
+            return Integer.parseInt(args[0]);
+        }
+        String configuredPort = System.getenv("PORT");
+        return configuredPort == null || configuredPort.isBlank()
+                ? DEFAULT_PORT
+                : Integer.parseInt(configuredPort);
+    }
+}
+=== C:\Users\pierr\Documents\GitHub\Architecture_ProjetSession\pom.xml ===
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <groupId>com.rpg</groupId>
+    <artifactId>api-rpg</artifactId>
+    <version>1.0-SNAPSHOT</version>
+
+    <properties>
+        <maven.compiler.release>17</maven.compiler.release>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+    </properties>
+
+    <dependencies>
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <version>5.10.2</version>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <sourceDirectory>${project.basedir}</sourceDirectory>
+        <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-compiler-plugin</artifactId>
+                <version>3.13.0</version>
+                <configuration>
+                    <includes>
+                        <include>Main.java</include>
+                        <include>config/**/*.java</include>
+                        <include>heros/**/*.java</include>
+                        <include>src/main/java/rpg/**/*.java</include>
+                    </includes>
+                    <testIncludes>
+                        <testInclude>**/*.java</testInclude>
+                    </testIncludes>
+                </configuration>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-surefire-plugin</artifactId>
+                <version>3.2.5</version>
+            </plugin>
+            <plugin>
+                <groupId>org.codehaus.mojo</groupId>
+                <artifactId>exec-maven-plugin</artifactId>
+                <version>3.1.1</version>
+                <configuration>
+                    <mainClass>hero.Main</mainClass>
+                </configuration>
+            </plugin>
+        </plugins>
+    </build>
+</project>

@@ -1,6 +1,6 @@
-package hero.domain;
+package heros.domain;
 
-import hero.domain.exception.HeroNameAlreadyTakenException;
+import heros.domain.exception.HeroNameAlreadyTakenException;
 
 import java.util.UUID;
 

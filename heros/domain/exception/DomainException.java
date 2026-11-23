@@ -1,4 +1,4 @@
-package hero.domain.exception;
+package heros.domain.exception;
 
 
 public abstract class DomainException extends RuntimeException {

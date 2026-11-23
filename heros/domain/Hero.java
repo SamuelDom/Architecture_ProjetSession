@@ -1,4 +1,4 @@
-package hero.domain;
+package heros.domain;
 
 import java.util.Objects;
 

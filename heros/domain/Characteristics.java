@@ -1,4 +1,4 @@
-package hero.domain;
+package heros.domain;
 
 public final class Characteristics {
 

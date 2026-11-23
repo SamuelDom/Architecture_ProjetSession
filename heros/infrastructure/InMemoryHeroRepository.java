@@ -1,9 +1,9 @@
-package hero.infrastructure;
+package heros.infrastructure;
 
-import hero.domain.Hero;
-import hero.domain.HeroId;
-import hero.domain.HeroName;
-import hero.domain.HeroRepository;
+import heros.domain.Hero;
+import heros.domain.HeroId;
+import heros.domain.HeroName;
+import heros.domain.HeroRepository;
 
 import java.util.HashMap;
 import java.util.Map;

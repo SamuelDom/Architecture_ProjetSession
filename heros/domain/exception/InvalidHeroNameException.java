@@ -1,4 +1,4 @@
-package hero.domain.exception;
+package heros.domain.exception;
 
 public class InvalidHeroNameException extends DomainException {
     public InvalidHeroNameException(String message) {

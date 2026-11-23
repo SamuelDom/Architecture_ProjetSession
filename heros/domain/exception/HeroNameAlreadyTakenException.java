@@ -1,4 +1,4 @@
-package hero.domain.exception;
+package heros.domain.exception;
 
 public class HeroNameAlreadyTakenException extends DomainException {
     public HeroNameAlreadyTakenException(String name) {

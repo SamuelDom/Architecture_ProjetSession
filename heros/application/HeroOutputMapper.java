@@ -1,6 +1,6 @@
-package hero.application;
+package heros.application;
 
-import hero.domain.Hero;
+import heros.domain.Hero;
 
 public class HeroOutputMapper {
 

@@ -1,4 +1,4 @@
-package hero.application;
+package heros.application;
 
 public record HeroOutput(String id, String name, String species, String heroClass,
                          int level, int experience,

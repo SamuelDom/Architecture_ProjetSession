@@ -1,7 +1,7 @@
-package hero.domain;
+package heros.domain;
 
-import hero.infrastructure.InMemoryHeroRepository;
-import hero.domain.exception.DomainException;
+import heros.infrastructure.InMemoryHeroRepository;
+import heros.domain.exception.DomainException;
 
 public class HeroDemo {
 

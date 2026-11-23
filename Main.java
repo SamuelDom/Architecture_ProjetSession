@@ -1,7 +1,5 @@
-package hero;
-
 import config.ApplicationContext;
-import hero.infrastructure.HeroHttpServer;
+import heros.infrastructure.HeroHttpServer;
 import java.io.IOException;
 
 public final class Main {

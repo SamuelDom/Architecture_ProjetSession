@@ -34,6 +34,7 @@
                         <include>Main.java</include>
                         <include>config/**/*.java</include>
                         <include>heros/**/*.java</include>
+                        <include>lobbies/**/*.java</include>
                         <include>src/main/java/rpg/**/*.java</include>
                     </includes>
                     <testIncludes>

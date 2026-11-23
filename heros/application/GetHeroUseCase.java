@@ -1,7 +1,7 @@
-package hero.application;
+package heros.application;
 
-import hero.domain.HeroId;
-import hero.domain.HeroRepository;
+import heros.domain.HeroId;
+import heros.domain.HeroRepository;
 
 import java.util.Optional;
 import java.util.UUID;

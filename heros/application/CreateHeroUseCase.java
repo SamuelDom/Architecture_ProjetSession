@@ -1,10 +1,10 @@
-package hero.application;
+package heros.application;
 
-import hero.domain.Characteristics;
-import hero.domain.Hero;
-import hero.domain.HeroFactory;
-import hero.domain.HeroName;
-import hero.domain.HeroRepository;
+import heros.domain.Characteristics;
+import heros.domain.Hero;
+import heros.domain.HeroFactory;
+import heros.domain.HeroName;
+import heros.domain.HeroRepository;
 
 /** Orchestre le cas d'utilisation : aucune règle métier ici, seulement de la coordination. */
 public class CreateHeroUseCase {
